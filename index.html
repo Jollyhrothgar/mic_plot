@@ -879,26 +879,20 @@
       const inst = INSTRUMENTS[p.instrument];
       const iH = resolveInstHeight(p);
       const vH = resolveVoiceHeight(p);
-      const vizScale = 3.0; // visual size of the directivity pattern
+      const vizScale = 3.5;
 
-      // Instrument directivity (on floor and at instrument height)
-      const instLine = createDirectivityLine(inst.dir, vizScale, p.color, p.instrumentFacing, p.position.x, 0.02, p.position.z);
+      // Instrument directivity — single lobe at instrument height, matches Inst arrow
+      const instLine = createDirectivityLine(inst.dir, vizScale, p.color, p.instrumentFacing, p.position.x, iH, p.position.z);
       scene.add(instLine); directivityMeshes.push(instLine);
-      const instFill = createDirectivityFill(inst.dir, vizScale, p.color, p.instrumentFacing, p.position.x, 0.02, p.position.z);
+      const instFill = createDirectivityFill(inst.dir, vizScale, p.color, p.instrumentFacing, p.position.x, iH, p.position.z);
       scene.add(instFill); directivityMeshes.push(instFill);
-      // At instrument height too
-      const instLineH = createDirectivityLine(inst.dir, vizScale * 0.7, p.color, p.instrumentFacing, p.position.x, iH, p.position.z);
-      scene.add(instLineH); directivityMeshes.push(instLineH);
 
-      // Voice directivity
+      // Voice directivity — single lobe at voice height, matches Vox arrow
       if (p.singing) {
-        const voiceLine = createDirectivityLine(VOICE.dir, vizScale * 0.8, 0xff6666, p.voiceFacing, p.position.x, 0.03, p.position.z);
+        const voiceLine = createDirectivityLine(VOICE.dir, vizScale * 0.85, 0xff4444, p.voiceFacing, p.position.x, vH, p.position.z);
         scene.add(voiceLine); directivityMeshes.push(voiceLine);
-        const voiceFill = createDirectivityFill(VOICE.dir, vizScale * 0.8, 0xff6666, p.voiceFacing, p.position.x, 0.03, p.position.z);
+        const voiceFill = createDirectivityFill(VOICE.dir, vizScale * 0.85, 0xff4444, p.voiceFacing, p.position.x, vH, p.position.z);
         scene.add(voiceFill); directivityMeshes.push(voiceFill);
-        // At voice height
-        const voiceLineH = createDirectivityLine(VOICE.dir, vizScale * 0.6, 0xff6666, p.voiceFacing, p.position.x, vH, p.position.z);
-        scene.add(voiceLineH); directivityMeshes.push(voiceLineH);
       }
     }
 
