@@ -5,472 +5,142 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bluegrass Mic Plot — Stage Positioning Tool</title>
   <style>
-    /* ============================================
-       RESET & BASE
-       ============================================ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #0d1117;
-      --panel-bg: #161b22;
-      --card-bg: #1c2333;
-      --border: #30363d;
-      --text: #e6edf3;
-      --text-muted: #8b949e;
-      --accent: #58a6ff;
-      --green: #3fb950;
-      --yellow: #d29922;
-      --orange: #db6d28;
-      --red: #f85149;
-      --panel-width: 370px;
+      --bg: #0d1117; --panel-bg: #161b22; --card-bg: #1c2333; --border: #30363d;
+      --text: #e6edf3; --text-muted: #8b949e; --accent: #58a6ff;
+      --green: #3fb950; --yellow: #d29922; --orange: #db6d28; --red: #f85149;
+      --panel-width: 380px;
     }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      overflow: hidden;
-      height: 100vh;
-      width: 100vw;
-    }
-
-    /* ============================================
-       LAYOUT
-       ============================================ */
-    #app {
-      display: flex;
-      height: 100vh;
-      width: 100vw;
-    }
-
-    #panel {
-      width: var(--panel-width);
-      min-width: var(--panel-width);
-      background: var(--panel-bg);
-      border-right: 1px solid var(--border);
-      overflow-y: auto;
-      padding: 20px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      z-index: 10;
-    }
-
-    #viewport {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-    }
-
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); overflow: hidden; height: 100vh; }
+    #app { display: flex; height: 100vh; }
+    #panel { width: var(--panel-width); min-width: var(--panel-width); background: var(--panel-bg); border-right: 1px solid var(--border); overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 16px; z-index: 10; }
+    #viewport { flex: 1; position: relative; overflow: hidden; }
     #viewport canvas { display: block; }
-
-    /* ============================================
-       PANEL HEADER
-       ============================================ */
-    #panel header h1 {
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
-    }
-
-    #panel header .subtitle {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    /* ============================================
-       SECTIONS
-       ============================================ */
-    .section-title {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--text-muted);
-      margin-bottom: 10px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 6px;
-    }
-
-    /* ============================================
-       CONTROLS
-       ============================================ */
-    .control-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .control-row label {
-      font-size: 12px;
-      color: var(--text-muted);
-      min-width: 55px;
-    }
-
-    .control-row input[type="range"] {
-      flex: 1;
-      height: 4px;
-      -webkit-appearance: none;
-      appearance: none;
-      background: var(--border);
-      border-radius: 2px;
-      outline: none;
-    }
-
-    .control-row input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--accent);
-      cursor: pointer;
-    }
-
-    .control-row .value {
-      font-size: 12px;
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      min-width: 52px;
-      text-align: right;
-      color: var(--text);
-    }
-
-    /* ============================================
-       PLAYER CARDS
-       ============================================ */
-    .player-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 10px;
-      border-left: 3px solid transparent;
-      transition: border-color 0.2s;
-    }
-
-    .player-card:hover, .player-card.active {
-      border-color: var(--card-color);
-    }
-
-    .player-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .player-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .player-name {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .player-instrument {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-left: auto;
-    }
-
-    .player-stats {
-      display: flex;
-      gap: 12px;
-      margin-top: 8px;
-      font-size: 11px;
-      color: var(--text-muted);
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    }
-
-    .player-stat {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .singing-toggle {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 6px;
-      font-size: 12px;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .singing-toggle input[type="checkbox"] {
-      accent-color: var(--accent);
-    }
-
-    /* ============================================
-       MIX METERS
-       ============================================ */
-    .meter-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-
-    .meter-label {
-      font-size: 11px;
-      font-weight: 600;
-      min-width: 48px;
-    }
-
-    .meter-sublabel {
-      font-size: 10px;
-      color: var(--text-muted);
-      min-width: 30px;
-    }
-
-    .meter-bar-bg {
-      flex: 1;
-      height: 8px;
-      background: var(--bg);
-      border-radius: 4px;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .meter-bar {
-      height: 100%;
-      border-radius: 4px;
-      transition: width 0.15s ease, background 0.15s ease;
-      min-width: 2px;
-    }
-
-    .meter-value {
-      font-size: 11px;
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      min-width: 48px;
-      text-align: right;
-      color: var(--text-muted);
-    }
-
-    /* ============================================
-       BALANCE INDICATOR
-       ============================================ */
-    .balance-box {
-      margin-top: 12px;
-      padding: 10px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      text-align: center;
-      border: 1px solid var(--border);
-    }
-
-    .balance-good { background: rgba(63, 185, 80, 0.12); color: var(--green); border-color: rgba(63, 185, 80, 0.3); }
-    .balance-ok { background: rgba(210, 153, 34, 0.12); color: var(--yellow); border-color: rgba(210, 153, 34, 0.3); }
-    .balance-bad { background: rgba(248, 81, 73, 0.12); color: var(--red); border-color: rgba(248, 81, 73, 0.3); }
-
-    .balance-detail {
-      font-size: 11px;
-      font-weight: 400;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    /* ============================================
-       PRESETS
-       ============================================ */
-    .preset-buttons {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
-    }
-
-    .preset-btn {
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--card-bg);
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .preset-btn:hover {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-
-    /* ============================================
-       HELP TEXT
-       ============================================ */
-    .help-text {
-      font-size: 11px;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
-
-    .help-text strong {
-      color: var(--text);
-    }
-
-    /* ============================================
-       3D LABELS (CSS2DRenderer)
-       ============================================ */
-    .label-3d {
-      font-size: 11px;
-      font-weight: 600;
-      color: #fff;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-      pointer-events: none;
-      white-space: nowrap;
-    }
-
-    .label-3d-level {
-      font-size: 10px;
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      color: #aaa;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.9);
-      pointer-events: none;
-      white-space: nowrap;
-    }
-
-    .label-distance {
-      font-size: 9px;
-      color: #666;
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-      pointer-events: none;
-    }
-
-    /* ============================================
-       VIEW TOGGLE
-       ============================================ */
-    .view-buttons {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 10px;
-    }
-
-    .view-btn {
-      flex: 1;
-      font-size: 11px;
-      padding: 5px 8px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      background: var(--card-bg);
-      color: var(--text-muted);
-      cursor: pointer;
-      text-align: center;
-      transition: all 0.15s;
-    }
-
-    .view-btn.active {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-
-    /* ============================================
-       SCROLLBAR
-       ============================================ */
-    #panel::-webkit-scrollbar { width: 6px; }
+    #panel header h1 { font-size: 17px; font-weight: 700; }
+    #panel header .subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+    .control-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .control-row label { font-size: 11px; color: var(--text-muted); min-width: 50px; flex-shrink: 0; }
+    .control-row input[type="range"] { flex: 1; height: 4px; -webkit-appearance: none; appearance: none; background: var(--border); border-radius: 2px; outline: none; }
+    .control-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+    .control-row .value { font-size: 11px; font-family: 'SF Mono','Fira Code','Consolas',monospace; min-width: 44px; text-align: right; color: var(--text); flex-shrink: 0; }
+    .player-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; border-left: 3px solid transparent; }
+    .player-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .player-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .player-name-input { background: transparent; border: 1px solid transparent; color: var(--text); font-size: 13px; font-weight: 600; padding: 1px 4px; border-radius: 3px; width: 80px; }
+    .player-name-input:hover, .player-name-input:focus { border-color: var(--border); outline: none; background: var(--bg); }
+    .player-inst-select { background: var(--bg); border: 1px solid var(--border); color: var(--text-muted); font-size: 10px; padding: 2px 4px; border-radius: 3px; margin-left: auto; }
+    .remove-player-btn { background: none; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; padding: 0 4px; line-height: 1; }
+    .remove-player-btn:hover { color: var(--red); }
+    .player-height-row { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; font-size: 11px; color: var(--text-muted); }
+    .player-height-row input { width: 32px; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-size: 11px; padding: 2px; border-radius: 3px; text-align: center; }
+    .singing-toggle { display: flex; align-items: center; gap: 5px; margin-top: 4px; font-size: 11px; cursor: pointer; user-select: none; }
+    .singing-toggle input[type="checkbox"] { accent-color: var(--accent); }
+    .player-stats { display: flex; gap: 10px; margin-top: 5px; font-size: 10px; color: var(--text-muted); font-family: 'SF Mono','Fira Code','Consolas',monospace; }
+    .add-player-form { background: var(--card-bg); border: 1px dashed var(--border); border-radius: 8px; padding: 10px; }
+    .add-player-form .control-row input[type="text"], .add-player-form select { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-size: 11px; padding: 3px 6px; border-radius: 3px; }
+    .add-player-form input[type="text"] { width: 90px; }
+    .add-player-form select { width: 110px; }
+    .add-btn { width: 100%; padding: 6px; background: var(--accent); color: #fff; border: none; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; margin-top: 6px; }
+    .add-btn:hover { opacity: 0.85; }
+    #mix-chart { width: 100%; height: 180px; border-radius: 6px; display: block; }
+    .meter-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .meter-label { font-size: 10px; font-weight: 600; min-width: 44px; }
+    .meter-sublabel { font-size: 9px; color: var(--text-muted); min-width: 24px; }
+    .meter-bar-bg { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+    .meter-bar { height: 100%; border-radius: 3px; transition: width 0.15s ease; min-width: 1px; }
+    .meter-value { font-size: 10px; font-family: 'SF Mono','Fira Code','Consolas',monospace; min-width: 44px; text-align: right; color: var(--text-muted); }
+    .balance-box { margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-align: center; border: 1px solid var(--border); }
+    .balance-good { background: rgba(63,185,80,0.12); color: var(--green); border-color: rgba(63,185,80,0.3); }
+    .balance-ok { background: rgba(210,153,34,0.12); color: var(--yellow); border-color: rgba(210,153,34,0.3); }
+    .balance-bad { background: rgba(248,81,73,0.12); color: var(--red); border-color: rgba(248,81,73,0.3); }
+    .balance-detail { font-size: 10px; font-weight: 400; color: var(--text-muted); margin-top: 3px; }
+    .preset-buttons { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+    .preset-btn { font-size: 10px; padding: 4px 9px; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+    .preset-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .solver-btn { font-size: 10px; padding: 4px 9px; border-radius: 12px; border: 1px solid var(--green); background: rgba(63,185,80,0.15); color: var(--green); cursor: pointer; }
+    .solver-btn:hover { background: var(--green); color: #fff; }
+    .solver-btn.running { animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .view-buttons { display: flex; gap: 4px; margin-bottom: 8px; }
+    .view-btn { flex: 1; font-size: 10px; padding: 4px 6px; border-radius: 5px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-muted); cursor: pointer; text-align: center; }
+    .view-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .help-text { font-size: 10px; color: var(--text-muted); line-height: 1.5; }
+    .help-text strong { color: var(--text); }
+    .label-3d { font-size: 11px; font-weight: 600; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.8); pointer-events: none; white-space: nowrap; }
+    .label-3d-level { font-size: 10px; font-family: 'SF Mono','Fira Code','Consolas',monospace; color: #aaa; text-shadow: 0 1px 4px rgba(0,0,0,0.9); pointer-events: none; }
+    .label-distance { font-size: 9px; color: #555; font-family: 'SF Mono','Fira Code','Consolas',monospace; text-shadow: 0 1px 3px rgba(0,0,0,0.8); pointer-events: none; }
+    #panel::-webkit-scrollbar { width: 5px; }
     #panel::-webkit-scrollbar-track { background: transparent; }
     #panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-    #panel::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
   </style>
 </head>
 <body>
   <div id="app">
-    <!-- ==================== SIDE PANEL ==================== -->
     <aside id="panel">
       <header>
         <h1>Bluegrass Mic Plot</h1>
         <p class="subtitle">Ear Trumpet Labs Delphina &bull; Cardioid</p>
       </header>
-
-      <!-- View Toggle -->
       <div>
         <div class="view-buttons">
           <button class="view-btn active" data-view="perspective" onclick="setView('perspective')">3D View</button>
           <button class="view-btn" data-view="top" onclick="setView('top')">Top Down</button>
         </div>
       </div>
-
-      <!-- Mic Settings -->
       <section id="mic-settings">
         <div class="section-title">Microphone</div>
-        <div class="control-row">
-          <label>Height</label>
-          <input type="range" id="mic-height" min="3" max="7" step="0.1" value="5">
-          <span class="value" id="mic-height-val">5.0 ft</span>
-        </div>
-        <div class="control-row">
-          <label>Gain</label>
-          <input type="range" id="mic-gain" min="-20" max="20" step="1" value="0">
-          <span class="value" id="mic-gain-val">0 dB</span>
-        </div>
-        <div class="control-row">
-          <label>Rotate</label>
-          <input type="range" id="mic-rotation" min="-180" max="180" step="1" value="0">
-          <span class="value" id="mic-rotation-val">0°</span>
-        </div>
+        <div class="control-row"><label>Height</label><input type="range" id="mic-height" min="3" max="7" step="0.1" value="5"><span class="value" id="mic-height-val">5.0 ft</span></div>
+        <div class="control-row"><label>Gain</label><input type="range" id="mic-gain" min="-20" max="20" step="1" value="0"><span class="value" id="mic-gain-val">0 dB</span></div>
+        <div class="control-row"><label>Rotate</label><input type="range" id="mic-rotation" min="-180" max="180" step="1" value="0"><span class="value" id="mic-rotation-val">0&deg;</span></div>
       </section>
-
-      <!-- Presets -->
       <section>
-        <div class="section-title">Layout Presets</div>
+        <div class="section-title">Layout</div>
         <div class="preset-buttons">
           <button class="preset-btn" onclick="applyPreset('semicircle')">Semicircle</button>
           <button class="preset-btn" onclick="applyPreset('tight')">Tight Arc</button>
           <button class="preset-btn" onclick="applyPreset('diamond')">Diamond</button>
           <button class="preset-btn" onclick="applyPreset('line')">Line</button>
+          <button class="solver-btn" id="solver-btn" onclick="toggleSolver()">Auto Balance</button>
         </div>
       </section>
-
-      <!-- Band Members -->
       <section id="players-section">
         <div class="section-title">Band Members</div>
         <div id="player-cards"></div>
+        <div class="add-player-form">
+          <div class="control-row"><label>Name</label><input type="text" id="new-name" placeholder="Name" maxlength="20"></div>
+          <div class="control-row"><label>Instrument</label><select id="new-inst"></select></div>
+          <div class="player-height-row"><label style="min-width:50px">Height</label><input type="number" id="new-ft" min="4" max="7" value="5"> ft <input type="number" id="new-in" min="0" max="11" value="10"> in</div>
+          <button class="add-btn" onclick="addNewPlayer()">+ Add Player</button>
+        </div>
       </section>
-
-      <!-- Mix Meters -->
+      <section>
+        <div class="section-title">Mix Chart</div>
+        <canvas id="mix-chart"></canvas>
+      </section>
       <section id="mix-section">
-        <div class="section-title">Mix @ Mic</div>
+        <div class="section-title">Mix Detail</div>
         <div id="mix-meters"></div>
         <div id="balance-indicator"></div>
       </section>
-
-      <!-- Help -->
       <section>
         <div class="section-title">How To Use</div>
         <div class="help-text">
-          <strong>Drag</strong> players on the stage to reposition.<br>
-          <strong>Right-click + drag</strong> to orbit the camera.<br>
-          <strong>Scroll</strong> to zoom in/out.<br>
-          <strong>Middle-click + drag</strong> to pan.<br><br>
-          The <strong>heatmap</strong> shows mic sensitivity — green is the sweet spot, red is weak pickup.<br><br>
-          <strong>Instrument directivity</strong> is modeled: each instrument radiates sound differently based on its body shape. The arrow on each player shows their facing direction, which affects both voice projection and instrument radiation.<br><br>
-          <strong>Tip:</strong> Use a phone dB meter app (e.g. NIOSH SLM, Decibel X) to measure each player at 1 meter. Enter those values in the SPL sliders.
+          <strong>Drag players</strong> to reposition on stage.<br>
+          <strong>Drag arrow tips</strong> to aim voice or instrument independently.<br>
+          <strong>Drag source markers</strong> (spheres) up/down to adjust source height.<br>
+          <strong>Right-click drag</strong> to orbit camera. <strong>Scroll</strong> to zoom.<br><br>
+          The <strong>heatmap</strong> shows mic sensitivity. <strong>Auto Balance</strong> optimizes positions for even mix.<br><br>
+          <strong>Tip:</strong> Use a phone dB meter (NIOSH SLM, Decibel X) to measure each player at 1m.
         </div>
       </section>
     </aside>
-
-    <!-- ==================== 3D VIEWPORT ==================== -->
     <main id="viewport"></main>
   </div>
 
-  <!-- ==================== THREE.JS ==================== -->
   <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-    }
-  }
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
   </script>
 
   <script type="module">
@@ -478,348 +148,295 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-    // ========================================================
+    // ============================================================
     // CONFIGURATION
-    // ========================================================
-    const STAGE_SIZE = 20; // feet
-    const FEET_PER_METER = 3.28084;
+    // ============================================================
+    const STAGE_SIZE = 24;
+    const FT_PER_M = 3.28084;
     const HEATMAP_RES = 256;
-    const MIN_GAIN_DB = -40; // floor for calculations
-
-    // ========================================================
-    // INSTRUMENT DIRECTIVITY MODELS
-    // ========================================================
-    // Directivity function: gain(θ) = a + (1-a) * cos(θ)
-    //   a = 1.0 → omnidirectional
-    //   a = 0.5 → cardioid
-    //   a = 0.0 → figure-8
-    //
-    // Sources:
-    //   - Guitar/mandolin: soundhole + top plate radiation, ~5-8 dB front-to-back
-    //   - Banjo (resonator): head projects forward, resonator focuses sound
-    //   - Stand-up bass: large body, omnidirectional at low freq, some directivity at highs
-    //   - Voice: roughly cardioid, ~6-10 dB front-to-back
+    const MIN_DB = -40;
+    const PLAYER_RADIUS = 1.25; // 2.5 ft diameter
 
     const INSTRUMENTS = {
-      banjo: {
-        label: 'Banjo',
-        directivity: 0.60,   // subcardioid — resonator projects forward
-        defaultSPL: 88,      // banjos are LOUD
-        heightFraction: 0.57, // fraction of player height (chest/belly with strap)
-        color: '#4CAF50',
-        description: 'Resonator banjo: strong forward projection from the head',
-      },
-      guitar: {
-        label: 'Guitar',
-        directivity: 0.55,   // mild cardioid — soundhole + top plate
-        defaultSPL: 82,
-        heightFraction: 0.56,
-        color: '#2196F3',
-        description: 'Acoustic guitar: sound radiates from soundhole and top',
-      },
-      bass: {
-        label: 'Stand-up Bass',
-        directivity: 0.80,   // nearly omni — large body, low frequencies
-        defaultSPL: 78,
-        heightFraction: 0.47, // f-holes height relative to player
-        color: '#FF9800',
-        description: 'Upright bass: nearly omnidirectional, especially at low freq',
-      },
-      mandolin: {
-        label: 'F-style Mandolin',
-        directivity: 0.55,   // mild cardioid — similar to guitar
-        defaultSPL: 84,
-        heightFraction: 0.58,
-        color: '#AB47BC',
-        description: 'F-style mandolin: sound projects from soundhole and top',
-      },
+      banjo:    { label:'Banjo',           dir:0.60, spl:88, hFrac:0.57, desc:'Resonator: strong forward projection' },
+      guitar:   { label:'Guitar',          dir:0.55, spl:82, hFrac:0.56, desc:'Acoustic: soundhole + top plate' },
+      bass:     { label:'Stand-up Bass',   dir:0.80, spl:78, hFrac:0.47, desc:'Upright: nearly omnidirectional' },
+      mandolin: { label:'F-style Mandolin',dir:0.55, spl:84, hFrac:0.58, desc:'F-style: soundhole + top projection' },
+      fiddle:   { label:'Fiddle',          dir:0.65, spl:85, hFrac:0.72, desc:'Violin: top + f-holes, moderate directivity' },
+      dobro:    { label:'Dobro',           dir:0.55, spl:83, hFrac:0.54, desc:'Resonator guitar: forward projection' },
+      vocals:   { label:'Vocals Only',     dir:1.00, spl:0,  hFrac:0.50, desc:'No instrument' },
     };
 
-    const VOICE = {
-      directivity: 0.50,   // cardioid — voice projects forward
-      defaultSPL: 80,
-      heightOffset: -0.5,  // feet below top of head (mouth position)
-    };
+    const VOICE = { dir: 0.50, spl: 80, hOff: -0.5 };
 
-    // ========================================================
-    // BAND MEMBERS
-    // ========================================================
-    const BAND = [
-      {
-        name: 'Mike',
-        instrument: 'banjo',
-        height: 6 + 2/12,      // 6'2"
-        color: INSTRUMENTS.banjo.color,
-        instrumentSPL: INSTRUMENTS.banjo.defaultSPL,
-        voiceSPL: VOICE.defaultSPL,
+    const COLORS = ['#4CAF50','#2196F3','#FF9800','#AB47BC','#E91E63','#00BCD4','#FF5722','#8BC34A','#3F51B5','#FFEB3B','#795548','#607D8B'];
+
+    // ============================================================
+    // DEFAULT BAND
+    // ============================================================
+    function makePlayer(name, inst, heightFt, colorIdx, x, z) {
+      const c = COLORS[colorIdx % COLORS.length];
+      const facing = Math.atan2(-x, -z);
+      return {
+        name, instrument: inst, height: heightFt, color: c,
+        position: { x, z },
+        bodyFacing: facing, voiceFacing: facing, instrumentFacing: facing,
+        instrumentSPL: INSTRUMENTS[inst].spl, voiceSPL: VOICE.spl,
         singing: true,
-        facing: Math.PI,        // facing toward mic (mic is at Z=0, players at Z>0)
-        position: { x: -2.0, z: 3.0 },
-      },
-      {
-        name: 'Tim',
-        instrument: 'guitar',
-        height: 5 + 8/12,      // 5'8"
-        color: INSTRUMENTS.guitar.color,
-        instrumentSPL: INSTRUMENTS.guitar.defaultSPL,
-        voiceSPL: VOICE.defaultSPL,
-        singing: true,
-        facing: Math.PI,
-        position: { x: 2.0, z: 3.0 },
-      },
-      {
-        name: 'Matt',
-        instrument: 'bass',
-        height: 6 + 5/12,      // 6'5"
-        color: INSTRUMENTS.bass.color,
-        instrumentSPL: INSTRUMENTS.bass.defaultSPL,
-        voiceSPL: VOICE.defaultSPL,
-        singing: true,
-        facing: Math.PI,
-        position: { x: 0.0, z: 4.0 },
-      },
-      {
-        name: 'Robert',
-        instrument: 'mandolin',
-        height: 6 + 5/12,      // 6'5"
-        color: INSTRUMENTS.mandolin.color,
-        instrumentSPL: INSTRUMENTS.mandolin.defaultSPL,
-        voiceSPL: VOICE.defaultSPL,
-        singing: true,
-        facing: Math.PI,
-        position: { x: 3.0, z: 3.5 },
-      },
+        instrumentHeight: null, voiceHeight: null,
+      };
+    }
+
+    const DEFAULT_BAND = [
+      makePlayer('Mike',   'banjo',    6+2/12,  0, -2.0, 3.0),
+      makePlayer('Tim',    'guitar',   5+8/12,  1,  2.0, 3.0),
+      makePlayer('Matt',   'bass',     6+5/12,  2,  0.0, 4.5),
+      makePlayer('Robert', 'mandolin', 6+5/12,  3,  3.0, 3.5),
     ];
 
-    // ========================================================
-    // APPLICATION STATE
-    // ========================================================
+    // ============================================================
+    // STATE
+    // ============================================================
     const state = {
-      mic: {
-        height: 5.0,      // feet
-        gain: 0,           // dB
-        rotation: 0,       // degrees
-      },
-      players: BAND.map(p => ({ ...p, position: { ...p.position } })),
-      mixLevels: [],       // computed per-source levels at mic
-      isDragging: false,
-      draggedPlayerIndex: -1,
-      hoveredPlayerIndex: -1,
+      mic: { height: 5.0, gain: 0, rotation: 0 },
+      players: DEFAULT_BAND.map(p => ({ ...p, position: { ...p.position } })),
+      mixLevels: [],
+      dragMode: null, // null | 'body' | 'source' | 'arrow'
+      dragIndex: -1,
+      dragExtra: null, // sourceType or facingType
+      selectedPlayer: -1, // for showing directivity shapes
+      solverRunning: false, solverIter: 0,
     };
 
-    // ========================================================
-    // UTILITY FUNCTIONS
-    // ========================================================
-    function degToRad(deg) { return deg * Math.PI / 180; }
-    function radToDeg(rad) { return rad * 180 / Math.PI; }
-    function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+    // ============================================================
+    // UTILITIES
+    // ============================================================
+    const deg2r = d => d * Math.PI / 180;
+    const r2deg = r => r * 180 / Math.PI;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const linToDb = l => l <= 0 ? MIN_DB : 20 * Math.log10(l);
+    const dirGain = (theta, a) => a + (1 - a) * Math.cos(theta);
+    const micGain = theta => Math.max(0.001, 0.5 + 0.5 * Math.cos(theta));
+    const micFwd = () => { const a = deg2r(state.mic.rotation); return new THREE.Vector3(Math.sin(a), 0, Math.cos(a)); };
+    const angBetween = (a, b) => Math.acos(clamp(a.dot(b), -1, 1));
 
-    function dBToLinear(db) { return Math.pow(10, db / 20); }
-    function linearToDB(lin) { return lin <= 0 ? MIN_GAIN_DB : 20 * Math.log10(lin); }
+    function resolveInstHeight(p) { return p.instrumentHeight ?? (p.height * INSTRUMENTS[p.instrument].hFrac); }
+    function resolveVoiceHeight(p) { return p.voiceHeight ?? (p.height + VOICE.hOff); }
 
-    // Directivity gain at angle theta with parameter a
-    function directivityGain(theta, a) {
-      return a + (1 - a) * Math.cos(theta);
-    }
-
-    // Cardioid mic polar pattern: standard cardioid
-    function micPolarGain(theta) {
-      return Math.max(0.001, 0.5 + 0.5 * Math.cos(theta));
-    }
-
-    // Mic forward direction vector (in XZ plane)
-    function getMicForward() {
-      const angle = degToRad(state.mic.rotation);
-      return new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
-    }
-
-    // Compute the angle between two 3D vectors
-    function angleBetween(v1, v2) {
-      const dot = v1.dot(v2);
-      return Math.acos(clamp(dot, -1, 1));
-    }
-
-    // ========================================================
-    // SIMULATION ENGINE
-    // ========================================================
+    // ============================================================
+    // SIMULATION (FIXED: mic angle direction)
+    // ============================================================
     function computeMixLevels() {
-      const micPos = new THREE.Vector3(0, state.mic.height, 0);
-      const micFwd = getMicForward();
+      const mPos = new THREE.Vector3(0, state.mic.height, 0);
+      const mFwd = micFwd();
       const results = [];
 
-      for (const player of state.players) {
-        const inst = INSTRUMENTS[player.instrument];
-        const voiceHeight = player.height + VOICE.heightOffset;
-        const instrumentHeight = player.height * inst.heightFraction;
+      for (const p of state.players) {
+        const inst = INSTRUMENTS[p.instrument];
+        const vH = resolveVoiceHeight(p);
+        const iH = resolveInstHeight(p);
 
-        // Player facing direction (the direction the player faces)
-        // facing=0 means +Z, facing=PI means -Z (toward origin/mic)
-        const playerFwd = new THREE.Vector3(
-          Math.sin(player.facing),
-          0,
-          Math.cos(player.facing)
-        );
+        // Voice facing direction
+        const vFwd = new THREE.Vector3(Math.sin(p.voiceFacing), 0, Math.cos(p.voiceFacing));
+        // Instrument facing direction
+        const iFwd = new THREE.Vector3(Math.sin(p.instrumentFacing), 0, Math.cos(p.instrumentFacing));
 
-        // --- Voice source ---
-        let voiceLevel = MIN_GAIN_DB;
-        if (player.singing) {
-          const voicePos = new THREE.Vector3(player.position.x, voiceHeight, player.position.z);
-          const toMicFromVoice = new THREE.Vector3().subVectors(micPos, voicePos);
-          const distVoice = toMicFromVoice.length();
-          const toMicDirFromVoice = toMicFromVoice.clone().normalize();
-
-          // Voice directivity: how much voice projects toward the mic
-          const voiceAngle = angleBetween(playerFwd, toMicDirFromVoice);
-          const voiceGain = directivityGain(voiceAngle, VOICE.directivity);
-
-          // Mic polar pattern: how sensitive the mic is to this direction
-          const fromMicToVoice = toMicDirFromVoice.clone().negate();
-          const micAngle = angleBetween(micFwd, fromMicToVoice.negate());
-          const micGain = micPolarGain(micAngle);
-
-          // Inverse square law (reference: 1 meter = 3.281 feet)
-          const distAtten = -20 * Math.log10(distVoice / FEET_PER_METER);
-
-          voiceLevel = player.voiceSPL + distAtten
-            + linearToDB(voiceGain) + linearToDB(micGain) + state.mic.gain;
+        // --- Voice ---
+        let voiceLevel = MIN_DB;
+        const vPos = new THREE.Vector3(p.position.x, vH, p.position.z);
+        if (p.singing) {
+          const vToMic = new THREE.Vector3().subVectors(mPos, vPos).normalize();
+          const distV = vPos.distanceTo(mPos);
+          // Voice directivity: angle between voice facing and direction to mic
+          const vAngle = angBetween(vFwd, vToMic);
+          const vGain = dirGain(vAngle, VOICE.dir);
+          // Mic polar: angle between mic forward and direction FROM mic TO source
+          const micToV = new THREE.Vector3().subVectors(vPos, mPos).normalize();
+          const mAngle = angBetween(mFwd, micToV);
+          const mGain = micGain(mAngle);
+          voiceLevel = p.voiceSPL - 20*Math.log10(distV/FT_PER_M) + linToDb(vGain) + linToDb(mGain) + state.mic.gain;
         }
 
-        // --- Instrument source ---
-        const instPos = new THREE.Vector3(player.position.x, instrumentHeight, player.position.z);
-        const toMicFromInst = new THREE.Vector3().subVectors(micPos, instPos);
-        const distInst = toMicFromInst.length();
-        const toMicDirFromInst = toMicFromInst.clone().normalize();
+        // --- Instrument ---
+        const iPos = new THREE.Vector3(p.position.x, iH, p.position.z);
+        const iToMic = new THREE.Vector3().subVectors(mPos, iPos).normalize();
+        const distI = iPos.distanceTo(mPos);
+        const iAngle = angBetween(iFwd, iToMic);
+        const iGainVal = dirGain(iAngle, inst.dir);
+        const micToI = new THREE.Vector3().subVectors(iPos, mPos).normalize();
+        const mAngleI = angBetween(mFwd, micToI);
+        const mGainI = micGain(mAngleI);
+        const instrumentLevel = p.instrumentSPL - 20*Math.log10(distI/FT_PER_M) + linToDb(iGainVal) + linToDb(mGainI) + state.mic.gain;
 
-        // Instrument directivity
-        const instAngle = angleBetween(playerFwd, toMicDirFromInst);
-        const instGain = directivityGain(instAngle, inst.directivity);
-
-        // Mic polar pattern
-        const micAngleInst = angleBetween(micFwd, toMicDirFromInst);
-        const micGainInst = micPolarGain(micAngleInst);
-
-        // Inverse square law
-        const distAttenInst = -20 * Math.log10(distInst / FEET_PER_METER);
-
-        const instrumentLevel = player.instrumentSPL + distAttenInst
-          + linearToDB(instGain) + linearToDB(micGainInst) + state.mic.gain;
-
-        // Combined level (power sum)
-        const voiceLin = Math.pow(10, voiceLevel / 10);
-        const instLin = Math.pow(10, instrumentLevel / 10);
-        const combinedLevel = 10 * Math.log10(voiceLin + instLin);
+        // Combined (power sum)
+        const vLin = Math.pow(10, Math.max(MIN_DB, voiceLevel) / 10);
+        const iLin = Math.pow(10, Math.max(MIN_DB, instrumentLevel) / 10);
+        const combined = 10 * Math.log10(vLin + iLin);
 
         results.push({
-          name: player.name,
-          color: player.color,
-          voiceLevel: Math.max(MIN_GAIN_DB, voiceLevel),
-          instrumentLevel: Math.max(MIN_GAIN_DB, instrumentLevel),
-          combinedLevel: Math.max(MIN_GAIN_DB, combinedLevel),
-          distVoice: player.singing ? new THREE.Vector3(player.position.x, voiceHeight, player.position.z).distanceTo(micPos) : 0,
-          distInstrument: instPos.distanceTo(micPos),
-          voicePos: player.singing ? new THREE.Vector3(player.position.x, voiceHeight, player.position.z) : null,
-          instrumentPos: instPos,
+          name: p.name, color: p.color,
+          voiceLevel: Math.max(MIN_DB, voiceLevel),
+          instrumentLevel: Math.max(MIN_DB, instrumentLevel),
+          combinedLevel: Math.max(MIN_DB, combined),
+          distI, vPos: p.singing ? vPos : null, iPos,
         });
       }
-
       state.mixLevels = results;
       return results;
     }
 
-    // ========================================================
-    // HEATMAP GENERATION
-    // ========================================================
-    function generateHeatmap() {
-      const canvas = document.createElement('canvas');
-      canvas.width = HEATMAP_RES;
-      canvas.height = HEATMAP_RES;
-      const ctx = canvas.getContext('2d');
-      const imageData = ctx.createImageData(HEATMAP_RES, HEATMAP_RES);
+    // Quick version for solver (no Three.js objects reuse)
+    function computeSpread() {
+      computeMixLevels();
+      const lvls = state.mixLevels.map(m => m.combinedLevel);
+      return Math.max(...lvls) - Math.min(...lvls);
+    }
 
-      const micFwd = getMicForward();
-      const micHeight = state.mic.height;
-      const refHeight = micHeight; // compute sensitivity at mic capsule height
+    // ============================================================
+    // SOLVER
+    // ============================================================
+    const SOLVER_MIN_MIC_DIST = 2.5;  // minimum feet from mic center
+    const SOLVER_MAX_MIC_DIST = 8.0;  // maximum feet from mic center
+    const SOLVER_MIN_PLAYER_DIST = PLAYER_RADIUS * 2 + 1.0; // ~3.5 ft center-to-center
+    const SOLVER_MIN_Z = 1.5; // players must be in front of mic
 
-      for (let py = 0; py < HEATMAP_RES; py++) {
-        for (let px = 0; px < HEATMAP_RES; px++) {
-          // Map pixel to stage coordinates
-          const x = (px / HEATMAP_RES - 0.5) * STAGE_SIZE;
-          const z = (py / HEATMAP_RES - 0.5) * STAGE_SIZE;
+    function enforceConstraints() {
+      const half = STAGE_SIZE/2 - 1;
+      // Enforce distance from mic and stage bounds
+      for (const p of state.players) {
+        const distFromMic = Math.sqrt(p.position.x**2 + p.position.z**2);
+        if (distFromMic < SOLVER_MIN_MIC_DIST) {
+          const scale = SOLVER_MIN_MIC_DIST / Math.max(distFromMic, 0.01);
+          p.position.x *= scale;
+          p.position.z *= scale;
+        }
+        if (distFromMic > SOLVER_MAX_MIC_DIST) {
+          const scale = SOLVER_MAX_MIC_DIST / distFromMic;
+          p.position.x *= scale;
+          p.position.z *= scale;
+        }
+        p.position.z = Math.max(SOLVER_MIN_Z, p.position.z);
+        p.position.x = clamp(p.position.x, -half, half);
+        p.position.z = clamp(p.position.z, SOLVER_MIN_Z, half);
+      }
 
-          // Vector from mic to this point (at reference height)
-          const dx = x;
-          const dy = refHeight - micHeight; // = 0 at mic height
-          const dz = z;
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-          if (dist < 0.1) {
-            // Very close to mic — max sensitivity
-            const idx = (py * HEATMAP_RES + px) * 4;
-            imageData.data[idx] = 50;
-            imageData.data[idx + 1] = 255;
-            imageData.data[idx + 2] = 120;
-            imageData.data[idx + 3] = 160;
-            continue;
+      // Enforce min distance between players (multiple passes for stability)
+      for (let pass = 0; pass < 3; pass++) {
+        for (let i = 0; i < state.players.length; i++) {
+          for (let j = i+1; j < state.players.length; j++) {
+            const a = state.players[i].position, b = state.players[j].position;
+            const dx = b.x - a.x, dz = b.z - a.z;
+            const dist = Math.sqrt(dx*dx + dz*dz);
+            if (dist < SOLVER_MIN_PLAYER_DIST && dist > 0.01) {
+              const push = (SOLVER_MIN_PLAYER_DIST - dist) / 2;
+              const nx = dx/dist, nz = dz/dist;
+              a.x -= nx*push; a.z -= nz*push;
+              b.x += nx*push; b.z += nz*push;
+            }
           }
-
-          // Direction from mic to point
-          const dir = new THREE.Vector3(dx, dy, dz).normalize();
-
-          // Angle from mic forward axis
-          const angle = angleBetween(micFwd, dir);
-
-          // Mic polar gain
-          const gain = micPolarGain(angle);
-
-          // Sensitivity in dB (relative to on-axis at 1 meter)
-          const sensitivity_dB = linearToDB(gain) - 20 * Math.log10(dist / FEET_PER_METER);
-
-          // Map to color: green (0 dB) → yellow (-10) → red (-20) → transparent (-30+)
-          const t = clamp((sensitivity_dB + 30) / 30, 0, 1);
-
-          let r, g, b;
-          if (t > 0.66) {
-            const s = (t - 0.66) / 0.34;
-            r = Math.floor(50 + (1 - s) * 200);
-            g = Math.floor(200 + s * 55);
-            b = Math.floor(50 + s * 80);
-          } else if (t > 0.33) {
-            const s = (t - 0.33) / 0.33;
-            r = Math.floor(255);
-            g = Math.floor(100 + s * 100);
-            b = 30;
-          } else {
-            const s = t / 0.33;
-            r = Math.floor(120 + s * 135);
-            g = Math.floor(20 + s * 80);
-            b = 20;
-          }
-
-          const a = Math.floor(Math.pow(t, 1.3) * 140);
-
-          const idx = (py * HEATMAP_RES + px) * 4;
-          imageData.data[idx] = r;
-          imageData.data[idx + 1] = g;
-          imageData.data[idx + 2] = b;
-          imageData.data[idx + 3] = a;
         }
       }
 
-      ctx.putImageData(imageData, 0, 0);
-      return canvas;
+      // Re-enforce mic/stage bounds after push-apart
+      for (const p of state.players) {
+        const distFromMic = Math.sqrt(p.position.x**2 + p.position.z**2);
+        if (distFromMic < SOLVER_MIN_MIC_DIST) {
+          const scale = SOLVER_MIN_MIC_DIST / Math.max(distFromMic, 0.01);
+          p.position.x *= scale; p.position.z *= scale;
+        }
+        p.position.z = Math.max(SOLVER_MIN_Z, p.position.z);
+        p.position.x = clamp(p.position.x, -half, half);
+        p.position.z = clamp(p.position.z, SOLVER_MIN_Z, half);
+      }
     }
 
-    // ========================================================
-    // THREE.JS SCENE SETUP
-    // ========================================================
+    function solverStep() {
+      if (!state.solverRunning) return;
+      const lr = 0.02;
+      const eps = 0.05;
+      const spread0 = computeSpread();
+      if (spread0 < 0.5 || state.solverIter > 1200) {
+        state.solverRunning = false;
+        document.getElementById('solver-btn').classList.remove('running');
+        return;
+      }
+
+      for (const p of state.players) {
+        // Gradient w.r.t. x
+        p.position.x += eps;
+        enforceConstraints();
+        const sx = computeSpread();
+        p.position.x -= eps;
+        // Gradient w.r.t. z
+        p.position.z += eps;
+        enforceConstraints();
+        const sz = computeSpread();
+        p.position.z -= eps;
+
+        const gx = (sx - spread0) / eps;
+        const gz = (sz - spread0) / eps;
+        p.position.x -= lr * gx;
+        p.position.z -= lr * gz;
+      }
+
+      enforceConstraints();
+
+      // Auto-face mic
+      for (const p of state.players) {
+        const f = Math.atan2(-p.position.x, -p.position.z);
+        p.bodyFacing = f; p.voiceFacing = f; p.instrumentFacing = f;
+      }
+      state.solverIter++;
+    }
+
+    window.toggleSolver = function() {
+      state.solverRunning = !state.solverRunning;
+      state.solverIter = 0;
+      document.getElementById('solver-btn').classList.toggle('running', state.solverRunning);
+    };
+
+    // ============================================================
+    // HEATMAP
+    // ============================================================
+    function generateHeatmap() {
+      const c = document.createElement('canvas');
+      c.width = HEATMAP_RES; c.height = HEATMAP_RES;
+      const ctx = c.getContext('2d');
+      const img = ctx.createImageData(HEATMAP_RES, HEATMAP_RES);
+      const mFwd = micFwd(), mH = state.mic.height;
+
+      for (let py = 0; py < HEATMAP_RES; py++) {
+        for (let px = 0; px < HEATMAP_RES; px++) {
+          const x = (px/HEATMAP_RES - 0.5) * STAGE_SIZE;
+          const z = (py/HEATMAP_RES - 0.5) * STAGE_SIZE;
+          const dist = Math.sqrt(x*x + z*z);
+          if (dist < 0.1) { const idx=(py*HEATMAP_RES+px)*4; img.data[idx]=50; img.data[idx+1]=255; img.data[idx+2]=120; img.data[idx+3]=160; continue; }
+          const dir = new THREE.Vector3(x, 0, z).normalize();
+          const angle = angBetween(mFwd, dir);
+          const gain = micGain(angle);
+          const sens = linToDb(gain) - 20*Math.log10(dist/FT_PER_M);
+          const t = clamp((sens+30)/30, 0, 1);
+          let r, g, b;
+          if (t > 0.66) { const s=(t-0.66)/0.34; r=Math.floor(50+(1-s)*200); g=Math.floor(200+s*55); b=Math.floor(50+s*80); }
+          else if (t > 0.33) { const s=(t-0.33)/0.33; r=255; g=Math.floor(100+s*100); b=30; }
+          else { const s=t/0.33; r=Math.floor(120+s*135); g=Math.floor(20+s*80); b=20; }
+          const idx = (py*HEATMAP_RES+px)*4;
+          img.data[idx]=r; img.data[idx+1]=g; img.data[idx+2]=b; img.data[idx+3]=Math.floor(Math.pow(t,1.3)*140);
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      return c;
+    }
+
+    // ============================================================
+    // THREE.JS SCENE
+    // ============================================================
     const viewport = document.getElementById('viewport');
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0d1117);
-    scene.fog = new THREE.Fog(0x0d1117, 25, 50);
+    scene.fog = new THREE.Fog(0x0d1117, 30, 60);
 
-    const camera = new THREE.PerspectiveCamera(
-      50, viewport.clientWidth / viewport.clientHeight, 0.1, 100
-    );
+    const camera = new THREE.PerspectiveCamera(50, viewport.clientWidth/viewport.clientHeight, 0.1, 100);
     camera.position.set(0, 14, -10);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -829,7 +446,6 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     viewport.appendChild(renderer.domElement);
 
-    // CSS2D renderer for labels
     const labelRenderer = new CSS2DRenderer();
     labelRenderer.setSize(viewport.clientWidth, viewport.clientHeight);
     labelRenderer.domElement.style.position = 'absolute';
@@ -838,865 +454,903 @@
     labelRenderer.domElement.style.pointerEvents = 'none';
     viewport.appendChild(labelRenderer.domElement);
 
-    // Orbit controls
     const orbitControls = new OrbitControls(camera, renderer.domElement);
     orbitControls.target.set(0, 0, 2);
-    orbitControls.maxPolarAngle = Math.PI / 2 - 0.05;
+    orbitControls.maxPolarAngle = Math.PI/2 - 0.05;
     orbitControls.minDistance = 3;
-    orbitControls.maxDistance = 35;
+    orbitControls.maxDistance = 40;
     orbitControls.enableDamping = true;
     orbitControls.dampingFactor = 0.08;
     orbitControls.update();
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
     dirLight.position.set(8, 15, -5);
     dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 40;
-    dirLight.shadow.camera.left = -15;
-    dirLight.shadow.camera.right = 15;
-    dirLight.shadow.camera.top = 15;
-    dirLight.shadow.camera.bottom = -15;
+    dirLight.shadow.mapSize.set(2048, 2048);
+    dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 40;
+    dirLight.shadow.camera.left = -15; dirLight.shadow.camera.right = 15;
+    dirLight.shadow.camera.top = 15; dirLight.shadow.camera.bottom = -15;
     scene.add(dirLight);
+    const fill = new THREE.DirectionalLight(0x8888ff, 0.2);
+    fill.position.set(-5, 8, 10);
+    scene.add(fill);
 
-    const fillLight = new THREE.DirectionalLight(0x8888ff, 0.2);
-    fillLight.position.set(-5, 8, 10);
-    scene.add(fillLight);
-
-    // ========================================================
+    // ============================================================
     // FLOOR, GRID, HEATMAP
-    // ========================================================
-    // Dark floor
-    const floorGeo = new THREE.PlaneGeometry(STAGE_SIZE, STAGE_SIZE);
-    const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1a2e,
-      roughness: 0.9,
-      metalness: 0.0,
-    });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
+    // ============================================================
+    const floorMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(STAGE_SIZE, STAGE_SIZE),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.9 })
+    );
+    floorMesh.rotation.x = -Math.PI/2;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
 
-    // Grid
-    const grid = new THREE.GridHelper(STAGE_SIZE, STAGE_SIZE, 0x333355, 0x222244);
-    grid.position.y = 0.005;
-    scene.add(grid);
+    scene.add(new THREE.GridHelper(STAGE_SIZE, STAGE_SIZE, 0x333355, 0x222244));
 
-    // Distance rings from mic
     const ringGroup = new THREE.Group();
-    for (let r = 1; r <= 8; r++) {
-      const ringGeo = new THREE.RingGeometry(r - 0.015, r + 0.015, 128);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0x445566,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.25,
-      });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.y = 0.008;
+    for (let r = 1; r <= 10; r++) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(r-0.015, r+0.015, 128),
+        new THREE.MeshBasicMaterial({ color: 0x445566, side: THREE.DoubleSide, transparent: true, opacity: 0.2 })
+      );
+      ring.rotation.x = -Math.PI/2; ring.position.y = 0.008;
       ringGroup.add(ring);
-
-      // Distance label
-      const labelDiv = document.createElement('div');
-      labelDiv.className = 'label-distance';
-      labelDiv.textContent = `${r} ft`;
-      const labelObj = new CSS2DObject(labelDiv);
-      labelObj.position.set(r + 0.15, 0.01, 0.15);
-      ringGroup.add(labelObj);
+      if (r <= 6) {
+        const ld = document.createElement('div');
+        ld.className = 'label-distance';
+        ld.textContent = `${r}'`;
+        const lo = new CSS2DObject(ld);
+        lo.position.set(r+0.15, 0.01, 0.15);
+        ringGroup.add(lo);
+      }
     }
     scene.add(ringGroup);
 
-    // Heatmap overlay
-    const heatmapGeo = new THREE.PlaneGeometry(STAGE_SIZE, STAGE_SIZE);
-    const heatmapTexture = new THREE.CanvasTexture(generateHeatmap());
-    heatmapTexture.minFilter = THREE.LinearFilter;
-    heatmapTexture.magFilter = THREE.LinearFilter;
-    const heatmapMat = new THREE.MeshBasicMaterial({
-      map: heatmapTexture,
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    const heatmapMesh = new THREE.Mesh(heatmapGeo, heatmapMat);
-    heatmapMesh.rotation.x = -Math.PI / 2;
-    heatmapMesh.position.y = 0.012;
-    scene.add(heatmapMesh);
+    const hmTex = new THREE.CanvasTexture(generateHeatmap());
+    hmTex.minFilter = THREE.LinearFilter;
+    const hmMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(STAGE_SIZE, STAGE_SIZE),
+      new THREE.MeshBasicMaterial({ map: hmTex, transparent: true, depthWrite: false, side: THREE.DoubleSide })
+    );
+    hmMesh.rotation.x = -Math.PI/2;
+    hmMesh.position.y = 0.012;
+    scene.add(hmMesh);
 
-    // ========================================================
-    // CARDIOID OUTLINE ON FLOOR
-    // ========================================================
-    function createCardioidOutline(scale, color, opacity) {
-      const points = [];
-      const segments = 128;
+    // ============================================================
+    // CARDIOID OUTLINES
+    // ============================================================
+    function mkCardioid(s, col, op) {
+      const pts = [];
+      for (let i = 0; i <= 128; i++) {
+        const t = (i/128)*Math.PI*2, r = s*(0.5+0.5*Math.cos(t));
+        pts.push(new THREE.Vector3(r*Math.sin(t), 0.015, r*Math.cos(t)));
+      }
+      return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: op }));
+    }
+    const cardioidGrp = new THREE.Group();
+    cardioidGrp.add(mkCardioid(5, 0x3fb950, 0.5));
+    cardioidGrp.add(mkCardioid(8, 0xd29922, 0.3));
+    cardioidGrp.add(mkCardioid(12, 0xf85149, 0.15));
+    scene.add(cardioidGrp);
+
+    // ============================================================
+    // MIC OBJECT (Delphina: disc rotated for side-address)
+    // ============================================================
+    const micGroup = new THREE.Group();
+    // Stand
+    const standMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6, roughness: 0.3 });
+    const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 5, 8), standMat);
+    stand.position.y = 2.5; stand.castShadow = true;
+    micGroup.add(stand);
+    // Base
+    micGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.08, 16), new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.5, roughness: 0.4 })));
+    micGroup.children[1].position.y = 0.04;
+    // Mic head
+    const micHeadGrp = new THREE.Group();
+    const disc = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.45, 0.45, 0.15, 32),
+      new THREE.MeshStandardMaterial({ color: 0x997744, metalness: 0.4, roughness: 0.5 })
+    );
+    // Side-address: flat face toward performers. Rotate so axis points along Z (forward)
+    disc.rotation.x = Math.PI/2;
+    disc.castShadow = true;
+    micHeadGrp.add(disc);
+    // Grille indicator on front face
+    const grill = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.42, 0.42, 0.02, 32),
+      new THREE.MeshStandardMaterial({ color: 0xccaa66, metalness: 0.6, roughness: 0.3 })
+    );
+    grill.rotation.x = Math.PI/2;
+    grill.position.z = 0.08;
+    micHeadGrp.add(grill);
+    micHeadGrp.position.y = state.mic.height;
+    micGroup.add(micHeadGrp);
+    // Arrow
+    const micArrow = new THREE.ArrowHelper(new THREE.Vector3(0,0,1), new THREE.Vector3(0,state.mic.height,0), 1.5, 0xffcc44, 0.3, 0.2);
+    micGroup.add(micArrow);
+    // Label
+    const micLbl = document.createElement('div');
+    micLbl.className = 'label-3d';
+    micLbl.textContent = 'Delphina';
+    micLbl.style.color = '#ffcc44';
+    const micLblObj = new CSS2DObject(micLbl);
+    micLblObj.position.set(0, state.mic.height+0.8, 0);
+    micGroup.add(micLblObj);
+    scene.add(micGroup);
+
+    function updateMicObj() {
+      micHeadGrp.position.y = state.mic.height;
+      micArrow.position.y = state.mic.height;
+      micLblObj.position.y = state.mic.height+0.8;
+      stand.scale.y = state.mic.height/5;
+      stand.position.y = state.mic.height/2;
+      const a = deg2r(state.mic.rotation);
+      micArrow.setDirection(new THREE.Vector3(Math.sin(a), 0, Math.cos(a)));
+      micHeadGrp.rotation.y = a;
+      cardioidGrp.rotation.y = a;
+    }
+
+    // ============================================================
+    // PLAYER 3D OBJECTS
+    // ============================================================
+    let playerGroups = [];
+    let bodyHitTargets = [];
+    let sourceHitTargets = [];
+    let arrowTipTargets = [];
+    let playerLevelLabels = [];
+
+    function clearPlayers3D() {
+      playerGroups.forEach(g => { scene.remove(g); g.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) { if (Array.isArray(c.material)) c.material.forEach(m=>m.dispose()); else c.material.dispose(); } }); });
+      playerGroups = []; bodyHitTargets = []; sourceHitTargets = []; arrowTipTargets = []; playerLevelLabels = [];
+    }
+
+    function buildPlayers3D() {
+      clearPlayers3D();
+      state.players.forEach((p, i) => {
+        const grp = new THREE.Group();
+        const col = new THREE.Color(p.color);
+        const inst = INSTRUMENTS[p.instrument];
+        const bodyH = p.height * 0.75;
+        const iH = resolveInstHeight(p);
+        const vH = resolveVoiceHeight(p);
+
+        // Body (2.5 ft diameter = 1.25 radius)
+        const body = new THREE.Mesh(
+          new THREE.CylinderGeometry(PLAYER_RADIUS, PLAYER_RADIUS, bodyH, 24),
+          new THREE.MeshStandardMaterial({ color: col, roughness: 0.7, metalness: 0.1, transparent: true, opacity: 0.75 })
+        );
+        body.position.y = bodyH/2;
+        body.castShadow = true;
+        body.userData = { type: 'body', idx: i };
+        grp.add(body);
+        bodyHitTargets.push(body);
+
+        // Head
+        const head = new THREE.Mesh(
+          new THREE.SphereGeometry(0.3, 16, 12),
+          new THREE.MeshStandardMaterial({ color: 0xddccaa, roughness: 0.8 })
+        );
+        head.position.y = bodyH + 0.25;
+        head.castShadow = true;
+        grp.add(head);
+
+        // Instrument source marker (draggable)
+        const iMarker = new THREE.Mesh(
+          new THREE.SphereGeometry(0.22, 12, 8),
+          new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.3 })
+        );
+        iMarker.position.set(PLAYER_RADIUS + 0.3, iH, 0);
+        iMarker.userData = { type: 'source', idx: i, src: 'instrument' };
+        grp.add(iMarker);
+        sourceHitTargets.push(iMarker);
+
+        // Voice source marker (draggable)
+        const vMarker = new THREE.Mesh(
+          new THREE.SphereGeometry(0.18, 12, 8),
+          new THREE.MeshStandardMaterial({ color: 0xff8888, emissive: 0xff6666, emissiveIntensity: 0.3 })
+        );
+        vMarker.position.set(0, vH, PLAYER_RADIUS + 0.3);
+        vMarker.userData = { type: 'source', idx: i, src: 'voice' };
+        grp.add(vMarker);
+        sourceHitTargets.push(vMarker);
+
+        // Voice direction arrow (independent facing)
+        const vDir = voiceLocalDir(p);
+        const vArrow = new THREE.ArrowHelper(vDir, new THREE.Vector3(0, vH, 0), 2.0, 0xff6666, 0.35, 0.25);
+        vArrow.cone.userData = { type: 'arrow', idx: i, facing: 'voice' };
+        grp.add(vArrow);
+        arrowTipTargets.push(vArrow.cone);
+
+        // Instrument direction arrow (independent facing)
+        const iDir = instLocalDir(p);
+        const iArrow = new THREE.ArrowHelper(iDir, new THREE.Vector3(0, iH, 0), 2.0, col.getHex(), 0.35, 0.25);
+        iArrow.cone.userData = { type: 'arrow', idx: i, facing: 'instrument' };
+        grp.add(iArrow);
+        arrowTipTargets.push(iArrow.cone);
+
+        // Name label
+        const nd = document.createElement('div');
+        nd.className = 'label-3d';
+        nd.textContent = p.name;
+        nd.style.color = p.color;
+        const nl = new CSS2DObject(nd);
+        nl.position.set(0, p.height + 0.7, 0);
+        grp.add(nl);
+
+        // Level label
+        const ld = document.createElement('div');
+        ld.className = 'label-3d-level';
+        ld.textContent = '-- dB';
+        const ll = new CSS2DObject(ld);
+        ll.position.set(0, p.height + 0.3, 0);
+        grp.add(ll);
+        playerLevelLabels.push(ll);
+
+        grp.position.set(p.position.x, 0, p.position.z);
+        grp.rotation.y = p.bodyFacing;
+        scene.add(grp);
+        playerGroups.push(grp);
+      });
+    }
+
+    function voiceLocalDir(p) {
+      const a = p.voiceFacing - p.bodyFacing;
+      return new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
+    }
+    function instLocalDir(p) {
+      const a = p.instrumentFacing - p.bodyFacing;
+      return new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
+    }
+
+    function updatePlayers3D() {
+      state.players.forEach((p, i) => {
+        if (!playerGroups[i]) return;
+        const grp = playerGroups[i];
+        grp.position.set(p.position.x, 0, p.position.z);
+        grp.rotation.y = p.bodyFacing;
+
+        // Update arrow directions (compensate for group rotation)
+        const children = grp.children;
+        // Find arrows by iterating (voice arrow is first ArrowHelper, instrument is second)
+        let arrowCount = 0;
+        const iH = resolveInstHeight(p);
+        const vH = resolveVoiceHeight(p);
+        children.forEach(c => {
+          if (c.isArrowHelper) {
+            if (arrowCount === 0) {
+              // Voice arrow
+              c.setDirection(voiceLocalDir(p));
+              c.position.set(0, vH, 0);
+            } else {
+              // Instrument arrow
+              c.setDirection(instLocalDir(p));
+              c.position.set(0, iH, 0);
+            }
+            arrowCount++;
+          }
+        });
+
+        // Update source marker heights
+        sourceHitTargets.forEach(m => {
+          if (m.userData.idx === i) {
+            if (m.userData.src === 'instrument') m.position.y = iH;
+            else m.position.y = vH;
+          }
+        });
+
+        // Level label
+        if (state.mixLevels[i]) {
+          const lv = state.mixLevels[i].combinedLevel;
+          playerLevelLabels[i].element.textContent = lv > MIN_DB+1 ? `${lv.toFixed(1)} dB` : '-- dB';
+        }
+      });
+    }
+
+    // ============================================================
+    // SIGNAL LINES
+    // ============================================================
+    let signalLines = [];
+    function updateSignalLines() {
+      signalLines.forEach(l => scene.remove(l));
+      signalLines = [];
+      const mPos = new THREE.Vector3(0, state.mic.height, 0);
+
+      state.players.forEach((p, i) => {
+        const mix = state.mixLevels[i];
+        if (!mix) return;
+        const col = new THREE.Color(p.color);
+
+        // Instrument line
+        const iOp = clamp((mix.instrumentLevel - MIN_DB) / (0 - MIN_DB), 0.05, 0.8);
+        const il = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([mix.iPos, mPos]),
+          new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: iOp })
+        );
+        scene.add(il); signalLines.push(il);
+
+        // Voice line
+        if (p.singing && mix.vPos) {
+          const vOp = clamp((mix.voiceLevel - MIN_DB) / (0 - MIN_DB), 0.05, 0.6);
+          const vl = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([mix.vPos, mPos]),
+            new THREE.LineDashedMaterial({ color: 0xffaaaa, transparent: true, opacity: vOp, dashSize: 0.2, gapSize: 0.1 })
+          );
+          vl.computeLineDistances();
+          scene.add(vl); signalLines.push(vl);
+        }
+      });
+    }
+
+    // ============================================================
+    // DIRECTIVITY VISUALIZATION (shown when player selected)
+    // ============================================================
+    let directivityMeshes = [];
+
+    function createDirectivityLine(dirParam, scale, color, facingAngle, posX, posY, posZ) {
+      const pts = [];
+      const segments = 64;
       for (let i = 0; i <= segments; i++) {
         const theta = (i / segments) * Math.PI * 2;
-        const r = scale * (0.5 + 0.5 * Math.cos(theta));
-        const x = r * Math.sin(theta);
-        const z = r * Math.cos(theta);
-        points.push(new THREE.Vector3(x, 0.015, z));
+        const r = scale * Math.max(0.05, dirParam + (1 - dirParam) * Math.cos(theta));
+        // Rotate by facing angle
+        const localX = r * Math.sin(theta);
+        const localZ = r * Math.cos(theta);
+        const worldX = posX + localX * Math.cos(facingAngle) - localZ * Math.sin(facingAngle);
+        const worldZ = posZ + localX * Math.sin(facingAngle) + localZ * Math.cos(facingAngle);
+        pts.push(new THREE.Vector3(worldX, posY, worldZ));
       }
-      const geo = new THREE.BufferGeometry().setFromPoints(points);
-      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7, linewidth: 2 });
       return new THREE.Line(geo, mat);
     }
 
-    const cardioidGroup = new THREE.Group();
-    // -3dB, -6dB, -10dB contours at a reference distance
-    cardioidGroup.add(createCardioidOutline(5, 0x3fb950, 0.5));   // strong zone
-    cardioidGroup.add(createCardioidOutline(8, 0xd29922, 0.3));   // medium zone
-    cardioidGroup.add(createCardioidOutline(12, 0xf85149, 0.15)); // weak zone
-    scene.add(cardioidGroup);
-
-    function updateCardioidRotation() {
-      const angle = degToRad(state.mic.rotation);
-      cardioidGroup.rotation.y = angle;
+    function createDirectivityFill(dirParam, scale, color, facingAngle, posX, posY, posZ) {
+      // Create a filled shape using triangles
+      const shape = new THREE.Shape();
+      const segments = 64;
+      for (let i = 0; i <= segments; i++) {
+        const theta = (i / segments) * Math.PI * 2;
+        const r = scale * Math.max(0.05, dirParam + (1 - dirParam) * Math.cos(theta));
+        const x = r * Math.sin(theta);
+        const z = r * Math.cos(theta);
+        if (i === 0) shape.moveTo(x, z);
+        else shape.lineTo(x, z);
+      }
+      const geo = new THREE.ShapeGeometry(shape);
+      const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.rotation.z = -facingAngle;
+      mesh.position.set(posX, posY, posZ);
+      return mesh;
     }
 
-    // ========================================================
-    // MIC 3D OBJECT
-    // ========================================================
-    const micGroup = new THREE.Group();
+    function updateDirectivityViz() {
+      // Remove old
+      directivityMeshes.forEach(m => scene.remove(m));
+      directivityMeshes = [];
 
-    // Stand pole
-    const standGeo = new THREE.CylinderGeometry(0.05, 0.06, 5, 8);
-    const standMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6, roughness: 0.3 });
-    const stand = new THREE.Mesh(standGeo, standMat);
-    stand.position.y = 2.5;
-    stand.castShadow = true;
-    micGroup.add(stand);
+      const idx = state.selectedPlayer;
+      if (idx < 0 || idx >= state.players.length) return;
+      const p = state.players[idx];
+      const inst = INSTRUMENTS[p.instrument];
+      const iH = resolveInstHeight(p);
+      const vH = resolveVoiceHeight(p);
+      const vizScale = 3.0; // visual size of the directivity pattern
 
-    // Base
-    const baseGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.08, 16);
-    const baseMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.5, roughness: 0.4 });
-    const base = new THREE.Mesh(baseGeo, baseMat);
-    base.position.y = 0.04;
-    base.castShadow = true;
-    micGroup.add(base);
+      // Instrument directivity (on floor and at instrument height)
+      const instLine = createDirectivityLine(inst.dir, vizScale, p.color, p.instrumentFacing, p.position.x, 0.02, p.position.z);
+      scene.add(instLine); directivityMeshes.push(instLine);
+      const instFill = createDirectivityFill(inst.dir, vizScale, p.color, p.instrumentFacing, p.position.x, 0.02, p.position.z);
+      scene.add(instFill); directivityMeshes.push(instFill);
+      // At instrument height too
+      const instLineH = createDirectivityLine(inst.dir, vizScale * 0.7, p.color, p.instrumentFacing, p.position.x, iH, p.position.z);
+      scene.add(instLineH); directivityMeshes.push(instLineH);
 
-    // Mic head (Delphina-style disc)
-    const micHeadGroup = new THREE.Group();
-    const discGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.15, 32);
-    const discMat = new THREE.MeshStandardMaterial({ color: 0x997744, metalness: 0.4, roughness: 0.5 });
-    const disc = new THREE.Mesh(discGeo, discMat);
-    disc.rotation.z = Math.PI / 2;
-    disc.castShadow = true;
-    micHeadGroup.add(disc);
-
-    // Grille (front indicator)
-    const grillGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.02, 32);
-    const grillMat = new THREE.MeshStandardMaterial({ color: 0xccaa66, metalness: 0.6, roughness: 0.3 });
-    const grill = new THREE.Mesh(grillGeo, grillMat);
-    grill.rotation.z = Math.PI / 2;
-    grill.position.x = 0.08;
-    micHeadGroup.add(grill);
-
-    micHeadGroup.position.y = state.mic.height;
-    micGroup.add(micHeadGroup);
-
-    // Forward direction arrow
-    const arrowDir = new THREE.Vector3(0, 0, 1);
-    const arrowOrigin = new THREE.Vector3(0, state.mic.height, 0);
-    const micArrow = new THREE.ArrowHelper(arrowDir, arrowOrigin, 1.5, 0xffcc44, 0.3, 0.2);
-    micGroup.add(micArrow);
-
-    // Mic label
-    const micLabel = document.createElement('div');
-    micLabel.className = 'label-3d';
-    micLabel.textContent = 'Delphina';
-    micLabel.style.color = '#ffcc44';
-    const micLabelObj = new CSS2DObject(micLabel);
-    micLabelObj.position.set(0, state.mic.height + 0.8, 0);
-    micGroup.add(micLabelObj);
-
-    scene.add(micGroup);
-
-    function updateMicObject() {
-      micHeadGroup.position.y = state.mic.height;
-      micArrow.position.y = state.mic.height;
-      micLabelObj.position.y = state.mic.height + 0.8;
-
-      // Adjust stand height
-      stand.scale.y = state.mic.height / 5;
-      stand.position.y = state.mic.height / 2;
-
-      // Rotate mic direction
-      const angle = degToRad(state.mic.rotation);
-      const fwd = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
-      micArrow.setDirection(fwd);
-      micHeadGroup.rotation.y = angle;
+      // Voice directivity
+      if (p.singing) {
+        const voiceLine = createDirectivityLine(VOICE.dir, vizScale * 0.8, 0xff6666, p.voiceFacing, p.position.x, 0.03, p.position.z);
+        scene.add(voiceLine); directivityMeshes.push(voiceLine);
+        const voiceFill = createDirectivityFill(VOICE.dir, vizScale * 0.8, 0xff6666, p.voiceFacing, p.position.x, 0.03, p.position.z);
+        scene.add(voiceFill); directivityMeshes.push(voiceFill);
+        // At voice height
+        const voiceLineH = createDirectivityLine(VOICE.dir, vizScale * 0.6, 0xff6666, p.voiceFacing, p.position.x, vH, p.position.z);
+        scene.add(voiceLineH); directivityMeshes.push(voiceLineH);
+      }
     }
 
-    // ========================================================
-    // PLAYER 3D OBJECTS
-    // ========================================================
-    const playerGroups = [];
-    const playerHitTargets = [];
-    const playerLabels = [];
-    const playerLevelLabels = [];
-    const playerArrows = [];
-
-    function createPlayer3D(player, index) {
-      const group = new THREE.Group();
-      const color = new THREE.Color(player.color);
-      const inst = INSTRUMENTS[player.instrument];
-
-      // Body cylinder
-      const bodyHeight = player.height * 0.75;
-      const bodyGeo = new THREE.CylinderGeometry(0.3, 0.35, bodyHeight, 16);
-      const bodyMat = new THREE.MeshStandardMaterial({
-        color: color,
-        roughness: 0.7,
-        metalness: 0.1,
-        transparent: true,
-        opacity: 0.85,
-      });
-      const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.y = bodyHeight / 2;
-      body.castShadow = true;
-      body.userData = { playerIndex: index };
-      group.add(body);
-      playerHitTargets.push(body);
-
-      // Head sphere
-      const headGeo = new THREE.SphereGeometry(0.25, 16, 12);
-      const headMat = new THREE.MeshStandardMaterial({
-        color: 0xddccaa,
-        roughness: 0.8,
-      });
-      const head = new THREE.Mesh(headGeo, headMat);
-      head.position.y = bodyHeight + 0.2;
-      head.castShadow = true;
-      group.add(head);
-
-      // Instrument marker (small colored sphere at instrument height)
-      const instHeight = player.height * inst.heightFraction;
-      const instMarkerGeo = new THREE.SphereGeometry(0.12, 8, 6);
-      const instMarkerMat = new THREE.MeshBasicMaterial({ color: color });
-      const instMarker = new THREE.Mesh(instMarkerGeo, instMarkerMat);
-      instMarker.position.y = instHeight;
-      instMarker.position.x = 0.35;
-      group.add(instMarker);
-
-      // Voice marker (small sphere at mouth height)
-      const voiceHeight = player.height + VOICE.heightOffset;
-      const voiceMarkerGeo = new THREE.SphereGeometry(0.08, 8, 6);
-      const voiceMarkerMat = new THREE.MeshBasicMaterial({ color: 0xffaaaa });
-      const voiceMarker = new THREE.Mesh(voiceMarkerGeo, voiceMarkerMat);
-      voiceMarker.position.y = voiceHeight;
-      voiceMarker.position.z = 0.25;
-      group.add(voiceMarker);
-
-      // Facing direction arrow
-      const arrowDir = new THREE.Vector3(0, 0, 1);
-      const arrowOrigin = new THREE.Vector3(0, 0.1, 0);
-      const arrow = new THREE.ArrowHelper(arrowDir, arrowOrigin, 1.2, color.getHex(), 0.2, 0.15);
-      group.add(arrow);
-      playerArrows.push(arrow);
-
-      // Name label
-      const nameDiv = document.createElement('div');
-      nameDiv.className = 'label-3d';
-      nameDiv.textContent = player.name;
-      nameDiv.style.color = player.color;
-      const nameLabel = new CSS2DObject(nameDiv);
-      nameLabel.position.set(0, player.height + 0.7, 0);
-      group.add(nameLabel);
-      playerLabels.push(nameLabel);
-
-      // Level readout label
-      const levelDiv = document.createElement('div');
-      levelDiv.className = 'label-3d-level';
-      levelDiv.textContent = '-- dB';
-      const levelLabel = new CSS2DObject(levelDiv);
-      levelLabel.position.set(0, player.height + 0.3, 0);
-      group.add(levelLabel);
-      playerLevelLabels.push(levelLabel);
-
-      // Position the group
-      group.position.set(player.position.x, 0, player.position.z);
-
-      // Set facing rotation
-      group.rotation.y = player.facing;
-
-      scene.add(group);
-      playerGroups.push(group);
-    }
-
-    state.players.forEach((p, i) => createPlayer3D(p, i));
-
-    function updatePlayerObjects() {
-      state.players.forEach((player, i) => {
-        const group = playerGroups[i];
-        group.position.set(player.position.x, 0, player.position.z);
-        group.rotation.y = player.facing;
-
-        // Update level label
-        if (state.mixLevels[i]) {
-          const level = state.mixLevels[i].combinedLevel;
-          playerLevelLabels[i].element.textContent =
-            level > MIN_GAIN_DB + 1 ? `${level.toFixed(1)} dB` : '-- dB';
-        }
-      });
-    }
-
-    // ========================================================
-    // SIGNAL LINES (source → mic)
-    // ========================================================
-    const signalLines = [];
-
-    function createSignalLines() {
-      // Remove old lines
-      signalLines.forEach(l => scene.remove(l));
-      signalLines.length = 0;
-
-      const micPos = new THREE.Vector3(0, state.mic.height, 0);
-
-      state.players.forEach((player, i) => {
-        const inst = INSTRUMENTS[player.instrument];
-        const color = new THREE.Color(player.color);
-
-        // Instrument line
-        const instHeight = player.height * inst.heightFraction;
-        const instPos = new THREE.Vector3(player.position.x, instHeight, player.position.z);
-        const instGeo = new THREE.BufferGeometry().setFromPoints([instPos, micPos]);
-        const instLevel = state.mixLevels[i] ? state.mixLevels[i].instrumentLevel : MIN_GAIN_DB;
-        const instOpacity = clamp((instLevel - MIN_GAIN_DB) / (0 - MIN_GAIN_DB), 0.05, 0.8);
-        const instMat = new THREE.LineBasicMaterial({
-          color: color,
-          transparent: true,
-          opacity: instOpacity,
-          linewidth: 1,
-        });
-        const instLine = new THREE.Line(instGeo, instMat);
-        scene.add(instLine);
-        signalLines.push(instLine);
-
-        // Voice line
-        if (player.singing) {
-          const voiceHeight = player.height + VOICE.heightOffset;
-          const voicePos = new THREE.Vector3(player.position.x, voiceHeight, player.position.z);
-          const voiceGeo = new THREE.BufferGeometry().setFromPoints([voicePos, micPos]);
-          const voiceLevel = state.mixLevels[i] ? state.mixLevels[i].voiceLevel : MIN_GAIN_DB;
-          const voiceOpacity = clamp((voiceLevel - MIN_GAIN_DB) / (0 - MIN_GAIN_DB), 0.05, 0.6);
-          const voiceMat = new THREE.LineDashedMaterial({
-            color: 0xffaaaa,
-            transparent: true,
-            opacity: voiceOpacity,
-            dashSize: 0.2,
-            gapSize: 0.1,
-          });
-          const voiceLine = new THREE.Line(voiceGeo, voiceMat);
-          voiceLine.computeLineDistances();
-          scene.add(voiceLine);
-          signalLines.push(voiceLine);
-        }
-      });
-    }
-
-    // ========================================================
-    // INTERACTION: DRAG PLAYERS
-    // ========================================================
+    // ============================================================
+    // INTERACTION
+    // ============================================================
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
-    const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    const intersection = new THREE.Vector3();
+    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const vertPlane = new THREE.Plane();
+    const isect = new THREE.Vector3();
 
-    function getMouseNDC(event) {
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    function ndc(e) {
+      const r = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+      mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
     }
 
-    renderer.domElement.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return; // left click only
-      getMouseNDC(e);
+    renderer.domElement.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      ndc(e);
       raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObjects(playerHitTargets);
-      if (hits.length > 0) {
-        state.isDragging = true;
-        state.draggedPlayerIndex = hits[0].object.userData.playerIndex;
+
+      // Priority 1: arrow tips
+      const ah = raycaster.intersectObjects(arrowTipTargets);
+      if (ah.length > 0) {
+        state.dragMode = 'arrow';
+        state.dragIndex = ah[0].object.userData.idx;
+        state.dragExtra = ah[0].object.userData.facing;
+        orbitControls.enabled = false;
+        renderer.domElement.style.cursor = 'crosshair';
+        return;
+      }
+
+      // Priority 2: source markers
+      const sh = raycaster.intersectObjects(sourceHitTargets);
+      if (sh.length > 0) {
+        state.dragMode = 'source';
+        state.dragIndex = sh[0].object.userData.idx;
+        state.dragExtra = sh[0].object.userData.src;
+        // Vertical drag plane facing camera
+        const cd = camera.getWorldDirection(new THREE.Vector3());
+        const pn = new THREE.Vector3(cd.x, 0, cd.z).normalize();
+        const wp = new THREE.Vector3();
+        sh[0].object.getWorldPosition(wp);
+        vertPlane.setFromNormalAndCoplanarPoint(pn, wp);
+        orbitControls.enabled = false;
+        renderer.domElement.style.cursor = 'ns-resize';
+        return;
+      }
+
+      // Priority 3: body click/drag (also selects player for directivity viz)
+      const bh = raycaster.intersectObjects(bodyHitTargets);
+      if (bh.length > 0) {
+        const clickedIdx = bh[0].object.userData.idx;
+        state.selectedPlayer = (state.selectedPlayer === clickedIdx) ? -1 : clickedIdx;
+        state.dragMode = 'body';
+        state.dragIndex = clickedIdx;
         orbitControls.enabled = false;
         renderer.domElement.style.cursor = 'grabbing';
+        updateDirectivityViz();
+        return;
       }
+
+      // Clicked on nothing - deselect
+      state.selectedPlayer = -1;
+      updateDirectivityViz();
     });
 
-    renderer.domElement.addEventListener('pointermove', (e) => {
-      getMouseNDC(e);
+    renderer.domElement.addEventListener('pointermove', e => {
+      ndc(e);
+      raycaster.setFromCamera(mouse, camera);
 
-      if (state.isDragging && state.draggedPlayerIndex >= 0) {
-        raycaster.setFromCamera(mouse, camera);
-        raycaster.ray.intersectPlane(dragPlane, intersection);
-
-        // Clamp to stage bounds
-        const halfStage = STAGE_SIZE / 2 - 0.5;
-        const player = state.players[state.draggedPlayerIndex];
-        player.position.x = clamp(intersection.x, -halfStage, halfStage);
-        player.position.z = clamp(intersection.z, -halfStage, halfStage);
-
-        // Auto-face toward mic
-        const dx = -player.position.x;
-        const dz = -player.position.z;
-        player.facing = Math.atan2(dx, dz);
-
+      if (state.dragMode === 'body' && state.dragIndex >= 0) {
+        raycaster.ray.intersectPlane(floorPlane, isect);
+        const half = STAGE_SIZE/2 - 0.5;
+        const p = state.players[state.dragIndex];
+        p.position.x = clamp(isect.x, -half, half);
+        p.position.z = clamp(isect.z, -half, half);
+        const f = Math.atan2(-p.position.x, -p.position.z);
+        p.bodyFacing = f; p.voiceFacing = f; p.instrumentFacing = f;
         updateAll();
+      } else if (state.dragMode === 'source') {
+        raycaster.ray.intersectPlane(vertPlane, isect);
+        const p = state.players[state.dragIndex];
+        const newH = clamp(isect.y, 1, p.height);
+        if (state.dragExtra === 'instrument') p.instrumentHeight = newH;
+        else p.voiceHeight = newH;
+        updateAll();
+        buildPlayerCards(); // refresh height display
+      } else if (state.dragMode === 'arrow') {
+        raycaster.ray.intersectPlane(floorPlane, isect);
+        const p = state.players[state.dragIndex];
+        const dx = isect.x - p.position.x;
+        const dz = isect.z - p.position.z;
+        const a = Math.atan2(dx, dz);
+        if (state.dragExtra === 'voice') p.voiceFacing = a;
+        else p.instrumentFacing = a;
+        updateAll();
+        buildPlayerCards();
       } else {
-        // Hover detection
-        raycaster.setFromCamera(mouse, camera);
-        const hits = raycaster.intersectObjects(playerHitTargets);
-        if (hits.length > 0) {
-          renderer.domElement.style.cursor = 'grab';
-          state.hoveredPlayerIndex = hits[0].object.userData.playerIndex;
-        } else {
-          renderer.domElement.style.cursor = 'default';
-          state.hoveredPlayerIndex = -1;
-        }
+        // Hover
+        const allTargets = [...arrowTipTargets, ...sourceHitTargets, ...bodyHitTargets];
+        const hits = raycaster.intersectObjects(allTargets);
+        renderer.domElement.style.cursor = hits.length > 0 ? 'grab' : 'default';
       }
     });
 
     renderer.domElement.addEventListener('pointerup', () => {
-      state.isDragging = false;
-      state.draggedPlayerIndex = -1;
+      state.dragMode = null;
+      state.dragIndex = -1;
+      state.dragExtra = null;
       orbitControls.enabled = true;
       renderer.domElement.style.cursor = 'default';
     });
 
-    // ========================================================
-    // UI: BUILD PLAYER CARDS
-    // ========================================================
+    // ============================================================
+    // UI: PLAYER CARDS
+    // ============================================================
     function buildPlayerCards() {
-      const container = document.getElementById('player-cards');
-      container.innerHTML = '';
-
-      state.players.forEach((player, i) => {
-        const inst = INSTRUMENTS[player.instrument];
+      const ct = document.getElementById('player-cards');
+      ct.innerHTML = '';
+      state.players.forEach((p, i) => {
+        const inst = INSTRUMENTS[p.instrument];
+        const iH = resolveInstHeight(p);
+        const vH = resolveVoiceHeight(p);
         const card = document.createElement('div');
         card.className = 'player-card';
-        card.style.setProperty('--card-color', player.color);
-        card.style.borderLeftColor = player.color;
-        card.id = `player-card-${i}`;
+        card.style.borderLeftColor = p.color;
 
         card.innerHTML = `
           <div class="player-header">
-            <div class="player-dot" style="background:${player.color}"></div>
-            <span class="player-name">${player.name}</span>
-            <span class="player-instrument">${inst.label}</span>
+            <div class="player-dot" style="background:${p.color}"></div>
+            <input class="player-name-input" type="text" value="${p.name}" data-i="${i}" data-f="name">
+            <select class="player-inst-select" data-i="${i}" data-f="instrument">${Object.keys(INSTRUMENTS).map(k => `<option value="${k}" ${k===p.instrument?'selected':''}>${INSTRUMENTS[k].label}</option>`).join('')}</select>
+            <button class="remove-player-btn" onclick="removePlayer(${i})" title="Remove">&times;</button>
           </div>
-          <div class="control-row">
-            <label>Inst dB</label>
-            <input type="range" min="60" max="100" step="1" value="${player.instrumentSPL}"
-              data-player="${i}" data-field="instrumentSPL">
-            <span class="value" id="inst-spl-${i}">${player.instrumentSPL} dB</span>
+          <div class="player-height-row">
+            <input type="number" min="4" max="7" value="${Math.floor(p.height)}" data-i="${i}" data-f="htFt" style="width:28px"> ft
+            <input type="number" min="0" max="11" value="${Math.round((p.height%1)*12)}" data-i="${i}" data-f="htIn" style="width:28px"> in
           </div>
-          <div class="control-row">
-            <label>Voice dB</label>
-            <input type="range" min="60" max="100" step="1" value="${player.voiceSPL}"
-              data-player="${i}" data-field="voiceSPL">
-            <span class="value" id="voice-spl-${i}">${player.voiceSPL} dB</span>
-          </div>
-          <div class="control-row">
-            <label>Facing</label>
-            <input type="range" min="-180" max="180" step="1" value="${Math.round(radToDeg(player.facing))}"
-              data-player="${i}" data-field="facing">
-            <span class="value" id="facing-${i}">${Math.round(radToDeg(player.facing))}°</span>
-          </div>
-          <label class="singing-toggle">
-            <input type="checkbox" ${player.singing ? 'checked' : ''}
-              data-player="${i}" data-field="singing">
-            Singing
-          </label>
-          <div class="player-stats" id="player-stats-${i}">
-            <span class="player-stat">Dist: <span id="player-dist-${i}">--</span></span>
-            <span class="player-stat">@ Mic: <span id="player-at-mic-${i}">--</span></span>
-          </div>
+          <div class="control-row"><label>Inst dB</label><input type="range" min="60" max="100" step="1" value="${p.instrumentSPL}" data-i="${i}" data-f="instrumentSPL"><span class="value">${p.instrumentSPL}</span></div>
+          <div class="control-row"><label>Inst Ht</label><input type="range" min="1" max="${p.height.toFixed(1)}" step="0.1" value="${iH.toFixed(1)}" data-i="${i}" data-f="instrumentHeight"><span class="value">${iH.toFixed(1)}'</span></div>
+          <div class="control-row"><label>Voice dB</label><input type="range" min="60" max="100" step="1" value="${p.voiceSPL}" data-i="${i}" data-f="voiceSPL"><span class="value">${p.voiceSPL}</span></div>
+          <div class="control-row"><label>Voice Ht</label><input type="range" min="1" max="${p.height.toFixed(1)}" step="0.1" value="${vH.toFixed(1)}" data-i="${i}" data-f="voiceHeight"><span class="value">${vH.toFixed(1)}'</span></div>
+          <div class="control-row"><label>Voice Dir</label><input type="range" min="-180" max="180" step="1" value="${Math.round(r2deg(p.voiceFacing))}" data-i="${i}" data-f="voiceFacing"><span class="value">${Math.round(r2deg(p.voiceFacing))}&deg;</span></div>
+          <div class="control-row"><label>Inst Dir</label><input type="range" min="-180" max="180" step="1" value="${Math.round(r2deg(p.instrumentFacing))}" data-i="${i}" data-f="instrumentFacing"><span class="value">${Math.round(r2deg(p.instrumentFacing))}&deg;</span></div>
+          <label class="singing-toggle"><input type="checkbox" ${p.singing?'checked':''} data-i="${i}" data-f="singing"> Singing</label>
+          <div class="player-stats" id="pstat-${i}"><span>Dist: <span id="pdist-${i}">--</span></span><span>@ Mic: <span id="pmic-${i}">--</span></span></div>
         `;
 
-        // Event listeners for sliders
-        card.querySelectorAll('input[type="range"]').forEach(input => {
-          input.addEventListener('input', (e) => {
-            const pi = parseInt(e.target.dataset.player);
-            const field = e.target.dataset.field;
-            if (field === 'facing') {
-              state.players[pi].facing = degToRad(parseFloat(e.target.value));
-              document.getElementById(`facing-${pi}`).textContent = `${e.target.value}°`;
-            } else {
-              state.players[pi][field] = parseFloat(e.target.value);
-              if (field === 'instrumentSPL')
-                document.getElementById(`inst-spl-${pi}`).textContent = `${e.target.value} dB`;
-              if (field === 'voiceSPL')
-                document.getElementById(`voice-spl-${pi}`).textContent = `${e.target.value} dB`;
-            }
+        // Event binding
+        card.querySelectorAll('input[type="range"]').forEach(inp => {
+          inp.addEventListener('input', e => {
+            const idx = +e.target.dataset.i, f = e.target.dataset.f;
+            const val = parseFloat(e.target.value);
+            if (f === 'voiceFacing') state.players[idx].voiceFacing = deg2r(val);
+            else if (f === 'instrumentFacing') state.players[idx].instrumentFacing = deg2r(val);
+            else if (f === 'instrumentHeight') state.players[idx].instrumentHeight = val;
+            else if (f === 'voiceHeight') state.players[idx].voiceHeight = val;
+            else state.players[idx][f] = val;
+            e.target.nextElementSibling.textContent = f.includes('Facing') ? `${Math.round(val)}\u00B0` : f.includes('Height') ? `${val.toFixed?val.toFixed(1):val}'` : `${val}`;
             updateAll();
           });
         });
-
-        // Singing toggle
-        card.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
-          const pi = parseInt(e.target.dataset.player);
-          state.players[pi].singing = e.target.checked;
-          updateAll();
+        card.querySelectorAll('input[type="checkbox"]').forEach(inp => {
+          inp.addEventListener('change', e => { state.players[+e.target.dataset.i].singing = e.target.checked; updateAll(); });
+        });
+        card.querySelectorAll('input[type="text"]').forEach(inp => {
+          inp.addEventListener('input', e => { state.players[+e.target.dataset.i].name = e.target.value; rebuildAll(); });
+        });
+        card.querySelectorAll('select').forEach(sel => {
+          sel.addEventListener('change', e => {
+            const idx = +e.target.dataset.i;
+            state.players[idx].instrument = e.target.value;
+            state.players[idx].instrumentSPL = INSTRUMENTS[e.target.value].spl;
+            state.players[idx].instrumentHeight = null; // reset to auto
+            rebuildAll();
+          });
+        });
+        card.querySelectorAll('input[type="number"]').forEach(inp => {
+          inp.addEventListener('change', e => {
+            const idx = +e.target.dataset.i, f = e.target.dataset.f;
+            const p = state.players[idx];
+            if (f === 'htFt') { const ins = Math.round((p.height%1)*12); p.height = parseInt(e.target.value) + ins/12; }
+            if (f === 'htIn') { p.height = Math.floor(p.height) + parseInt(e.target.value)/12; }
+            p.instrumentHeight = null; p.voiceHeight = null; // reset to auto
+            rebuildAll();
+          });
         });
 
-        container.appendChild(card);
+        ct.appendChild(card);
       });
     }
 
-    // ========================================================
-    // UI: BUILD MIX METERS
-    // ========================================================
+    // ============================================================
+    // UI: MIX METERS
+    // ============================================================
     function buildMixMeters() {
-      const container = document.getElementById('mix-meters');
-      container.innerHTML = '';
-
-      state.players.forEach((player, i) => {
-        // Instrument meter
-        const instRow = document.createElement('div');
-        instRow.className = 'meter-row';
-        instRow.innerHTML = `
-          <span class="meter-label" style="color:${player.color}">${player.name}</span>
-          <span class="meter-sublabel">Inst</span>
-          <div class="meter-bar-bg">
-            <div class="meter-bar" id="meter-inst-${i}" style="background:${player.color}; width:0%"></div>
-          </div>
-          <span class="meter-value" id="meter-inst-val-${i}">--</span>
+      const ct = document.getElementById('mix-meters');
+      ct.innerHTML = '';
+      state.players.forEach((p, i) => {
+        ct.innerHTML += `
+          <div class="meter-row"><span class="meter-label" style="color:${p.color}">${p.name}</span><span class="meter-sublabel">Inst</span><div class="meter-bar-bg"><div class="meter-bar" id="mi-${i}" style="background:${p.color}"></div></div><span class="meter-value" id="miv-${i}">--</span></div>
+          ${p.singing ? `<div class="meter-row"><span class="meter-label"></span><span class="meter-sublabel">Vox</span><div class="meter-bar-bg"><div class="meter-bar" id="mv-${i}" style="background:${p.color};opacity:0.6"></div></div><span class="meter-value" id="mvv-${i}">--</span></div>` : ''}
+          <div class="meter-row" style="margin-bottom:10px"><span class="meter-label"></span><span class="meter-sublabel" style="font-weight:600">Mix</span><div class="meter-bar-bg" style="height:8px"><div class="meter-bar" id="mc-${i}" style="background:${p.color}"></div></div><span class="meter-value" id="mcv-${i}" style="font-weight:600">--</span></div>
         `;
-        container.appendChild(instRow);
-
-        // Voice meter
-        if (player.singing) {
-          const voiceRow = document.createElement('div');
-          voiceRow.className = 'meter-row';
-          voiceRow.innerHTML = `
-            <span class="meter-label" style="color:${player.color}"></span>
-            <span class="meter-sublabel">Vox</span>
-            <div class="meter-bar-bg">
-              <div class="meter-bar" id="meter-voice-${i}" style="background:${player.color}; opacity:0.6; width:0%"></div>
-            </div>
-            <span class="meter-value" id="meter-voice-val-${i}">--</span>
-          `;
-          container.appendChild(voiceRow);
-        }
-
-        // Combined meter
-        const combRow = document.createElement('div');
-        combRow.className = 'meter-row';
-        combRow.style.marginBottom = '12px';
-        combRow.innerHTML = `
-          <span class="meter-label" style="color:${player.color}"></span>
-          <span class="meter-sublabel" style="font-weight:600">Mix</span>
-          <div class="meter-bar-bg" style="height:10px">
-            <div class="meter-bar" id="meter-comb-${i}" style="background:${player.color}; width:0%"></div>
-          </div>
-          <span class="meter-value" id="meter-comb-val-${i}" style="font-weight:600">--</span>
-        `;
-        container.appendChild(combRow);
       });
     }
 
-    // ========================================================
-    // UI: UPDATE METERS AND STATS
-    // ========================================================
-    function updateMixMetersUI() {
-      if (!state.mixLevels.length) return;
+    // ============================================================
+    // UI: MIX CHART (Canvas)
+    // ============================================================
+    function drawMixChart() {
+      const canvas = document.getElementById('mix-chart');
+      if (!canvas || !state.mixLevels.length) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      const W = rect.width, H = rect.height;
+      const pL = 30, pR = 8, pT = 8, pB = 22;
+      const cW = W-pL-pR, cH = H-pT-pB;
+      const dbMin = -30, dbMax = 5;
+      const yDb = db => pT + cH * (1 - (db-dbMin)/(dbMax-dbMin));
 
-      // Find range for normalization
-      const combinedLevels = state.mixLevels.map(m => m.combinedLevel);
-      const maxLevel = Math.max(...combinedLevels);
-      const minLevel = Math.min(...combinedLevels);
-      const spread = maxLevel - minLevel;
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, W, H);
 
-      state.mixLevels.forEach((mix, i) => {
-        // Instrument meter
-        const instBar = document.getElementById(`meter-inst-${i}`);
-        const instVal = document.getElementById(`meter-inst-val-${i}`);
-        if (instBar) {
-          const instPct = clamp((mix.instrumentLevel + 30) / 30 * 100, 0, 100);
-          instBar.style.width = `${instPct}%`;
-          instVal.textContent = mix.instrumentLevel > MIN_GAIN_DB + 1
-            ? `${mix.instrumentLevel.toFixed(1)} dB` : '< -40';
-        }
-
-        // Voice meter
-        const voiceBar = document.getElementById(`meter-voice-${i}`);
-        const voiceVal = document.getElementById(`meter-voice-val-${i}`);
-        if (voiceBar) {
-          const voicePct = clamp((mix.voiceLevel + 30) / 30 * 100, 0, 100);
-          voiceBar.style.width = `${voicePct}%`;
-          voiceVal.textContent = mix.voiceLevel > MIN_GAIN_DB + 1
-            ? `${mix.voiceLevel.toFixed(1)} dB` : '< -40';
-        }
-
-        // Combined meter
-        const combBar = document.getElementById(`meter-comb-${i}`);
-        const combVal = document.getElementById(`meter-comb-val-${i}`);
-        if (combBar) {
-          const combPct = clamp((mix.combinedLevel + 30) / 30 * 100, 0, 100);
-          combBar.style.width = `${combPct}%`;
-          combVal.textContent = mix.combinedLevel > MIN_GAIN_DB + 1
-            ? `${mix.combinedLevel.toFixed(1)} dB` : '< -40';
-        }
-
-        // Player stats in card
-        const distEl = document.getElementById(`player-dist-${i}`);
-        const atMicEl = document.getElementById(`player-at-mic-${i}`);
-        if (distEl) {
-          const dist = mix.distInstrument / FEET_PER_METER;
-          distEl.textContent = `${(mix.distInstrument).toFixed(1)} ft`;
-        }
-        if (atMicEl) {
-          atMicEl.textContent = mix.combinedLevel > MIN_GAIN_DB + 1
-            ? `${mix.combinedLevel.toFixed(1)} dB` : '--';
-        }
-      });
-
-      // Update facing slider values (in case drag changed them)
-      state.players.forEach((player, i) => {
-        const facingEl = document.getElementById(`facing-${i}`);
-        const facingSlider = document.querySelector(`input[data-player="${i}"][data-field="facing"]`);
-        if (facingEl) {
-          const deg = Math.round(radToDeg(player.facing));
-          facingEl.textContent = `${deg}°`;
-          if (facingSlider && !state.isDragging) {
-            // Only update slider if not currently being dragged by user
-          }
-          if (facingSlider) facingSlider.value = deg;
-        }
-      });
-
-      // Balance indicator
-      const balanceDiv = document.getElementById('balance-indicator');
-      if (spread < 3) {
-        balanceDiv.innerHTML = `
-          <div class="balance-box balance-good">
-            Well Balanced
-            <div class="balance-detail">Spread: ${spread.toFixed(1)} dB</div>
-          </div>`;
-      } else if (spread < 6) {
-        balanceDiv.innerHTML = `
-          <div class="balance-box balance-ok">
-            Needs Adjustment
-            <div class="balance-detail">Spread: ${spread.toFixed(1)} dB &mdash; aim for < 3 dB</div>
-          </div>`;
-      } else {
-        balanceDiv.innerHTML = `
-          <div class="balance-box balance-bad">
-            Poorly Balanced
-            <div class="balance-detail">Spread: ${spread.toFixed(1)} dB &mdash; move players closer or adjust angles</div>
-          </div>`;
+      // Grid
+      ctx.strokeStyle = '#1c2333'; ctx.lineWidth = 0.5;
+      for (let db = dbMin; db <= dbMax; db += 5) {
+        const y = yDb(db);
+        ctx.beginPath(); ctx.moveTo(pL, y); ctx.lineTo(W-pR, y); ctx.stroke();
+        ctx.fillStyle = '#444'; ctx.font = '8px monospace'; ctx.textAlign = 'right';
+        ctx.fillText(`${db}`, pL-3, y+3);
       }
+
+      const n = state.players.length;
+      if (n === 0) return;
+      const bW = Math.min(40, (cW/n)*0.7);
+      const gap = cW/n;
+
+      state.mixLevels.forEach((m, i) => {
+        const x = pL + gap*i + (gap-bW)/2;
+        const p = state.players[i];
+
+        // Instrument bar (left half)
+        const iDb = clamp(m.instrumentLevel, dbMin, dbMax);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = 0.9;
+        ctx.fillRect(x, yDb(iDb), bW/2-1, yDb(dbMin)-yDb(iDb));
+
+        // Voice bar (right half)
+        if (p.singing) {
+          const vDb = clamp(m.voiceLevel, dbMin, dbMax);
+          ctx.globalAlpha = 0.5;
+          ctx.fillRect(x+bW/2+1, yDb(vDb), bW/2-1, yDb(dbMin)-yDb(vDb));
+        }
+        ctx.globalAlpha = 1;
+
+        // Combined marker line
+        const cDb = clamp(m.combinedLevel, dbMin, dbMax);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x-2, yDb(cDb)); ctx.lineTo(x+bW+2, yDb(cDb)); ctx.stroke();
+
+        // Label
+        ctx.fillStyle = p.color; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(p.name, x+bW/2, H-pB+12);
+
+        // Value
+        if (m.combinedLevel > dbMin+5) {
+          ctx.fillStyle = '#ccc'; ctx.font = '8px monospace';
+          ctx.fillText(m.combinedLevel.toFixed(1), x+bW/2, yDb(cDb)-4);
+        }
+      });
+
+      // Average line
+      const avg = state.mixLevels.reduce((s,m)=>s+m.combinedLevel,0)/n;
+      ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(pL, yDb(avg)); ctx.lineTo(W-pR, yDb(avg)); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#58a6ff'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
+      ctx.fillText(`avg ${avg.toFixed(1)}`, pL+2, yDb(avg)-3);
     }
 
-    // ========================================================
+    // ============================================================
+    // UI: UPDATE ALL METERS & STATS
+    // ============================================================
+    function updateUI() {
+      if (!state.mixLevels.length) return;
+      const levels = state.mixLevels.map(m => m.combinedLevel);
+      const spread = Math.max(...levels) - Math.min(...levels);
+
+      state.mixLevels.forEach((m, i) => {
+        const ib = document.getElementById(`mi-${i}`);
+        if (ib) { ib.style.width = `${clamp((m.instrumentLevel+30)/30*100,0,100)}%`; }
+        const iv = document.getElementById(`miv-${i}`);
+        if (iv) iv.textContent = m.instrumentLevel > MIN_DB+1 ? `${m.instrumentLevel.toFixed(1)}` : '<-40';
+        const vb = document.getElementById(`mv-${i}`);
+        if (vb) vb.style.width = `${clamp((m.voiceLevel+30)/30*100,0,100)}%`;
+        const vv = document.getElementById(`mvv-${i}`);
+        if (vv) vv.textContent = m.voiceLevel > MIN_DB+1 ? `${m.voiceLevel.toFixed(1)}` : '<-40';
+        const cb = document.getElementById(`mc-${i}`);
+        if (cb) cb.style.width = `${clamp((m.combinedLevel+30)/30*100,0,100)}%`;
+        const cv = document.getElementById(`mcv-${i}`);
+        if (cv) cv.textContent = m.combinedLevel > MIN_DB+1 ? `${m.combinedLevel.toFixed(1)}` : '<-40';
+        const de = document.getElementById(`pdist-${i}`);
+        if (de) de.textContent = `${m.distI.toFixed(1)}'`;
+        const me = document.getElementById(`pmic-${i}`);
+        if (me) me.textContent = m.combinedLevel > MIN_DB+1 ? `${m.combinedLevel.toFixed(1)}` : '--';
+      });
+
+      const bd = document.getElementById('balance-indicator');
+      if (spread < 3) bd.innerHTML = `<div class="balance-box balance-good">Well Balanced<div class="balance-detail">Spread: ${spread.toFixed(1)} dB</div></div>`;
+      else if (spread < 6) bd.innerHTML = `<div class="balance-box balance-ok">Needs Adjustment<div class="balance-detail">Spread: ${spread.toFixed(1)} dB &mdash; aim for &lt; 3 dB</div></div>`;
+      else bd.innerHTML = `<div class="balance-box balance-bad">Poorly Balanced<div class="balance-detail">Spread: ${spread.toFixed(1)} dB</div></div>`;
+
+      drawMixChart();
+    }
+
+    // ============================================================
+    // PLAYER MANAGEMENT
+    // ============================================================
+    window.removePlayer = function(idx) {
+      if (state.players.length <= 1) return;
+      state.players.splice(idx, 1);
+      rebuildAll();
+    };
+
+    window.addNewPlayer = function() {
+      const name = document.getElementById('new-name').value.trim() || `Player ${state.players.length+1}`;
+      const inst = document.getElementById('new-inst').value;
+      const ft = parseInt(document.getElementById('new-ft').value) || 5;
+      const inches = parseInt(document.getElementById('new-in').value) || 10;
+      const height = ft + inches/12;
+      const ci = state.players.length;
+      // Place in a reasonable position
+      const angle = -Math.PI/4 + (Math.PI/2)*(ci/(Math.max(state.players.length,1)));
+      const r = 3.5;
+      const x = r * Math.sin(angle), z = r * Math.cos(angle);
+      state.players.push(makePlayer(name, inst, height, ci, x, z));
+      document.getElementById('new-name').value = '';
+      rebuildAll();
+    };
+
+    function rebuildAll() {
+      buildPlayers3D();
+      buildPlayerCards();
+      buildMixMeters();
+      updateAll();
+    }
+
+    // ============================================================
     // MIC CONTROLS
-    // ========================================================
-    document.getElementById('mic-height').addEventListener('input', (e) => {
+    // ============================================================
+    document.getElementById('mic-height').addEventListener('input', e => {
       state.mic.height = parseFloat(e.target.value);
       document.getElementById('mic-height-val').textContent = `${state.mic.height.toFixed(1)} ft`;
-      updateMicObject();
-      refreshHeatmap();
-      updateAll();
+      updateMicObj(); hmDirty = true; updateAll();
     });
-
-    document.getElementById('mic-gain').addEventListener('input', (e) => {
+    document.getElementById('mic-gain').addEventListener('input', e => {
       state.mic.gain = parseInt(e.target.value);
       document.getElementById('mic-gain-val').textContent = `${state.mic.gain} dB`;
       updateAll();
     });
-
-    document.getElementById('mic-rotation').addEventListener('input', (e) => {
+    document.getElementById('mic-rotation').addEventListener('input', e => {
       state.mic.rotation = parseInt(e.target.value);
-      document.getElementById('mic-rotation-val').textContent = `${state.mic.rotation}°`;
-      updateMicObject();
-      updateCardioidRotation();
-      refreshHeatmap();
-      updateAll();
+      document.getElementById('mic-rotation-val').textContent = `${state.mic.rotation}\u00B0`;
+      updateMicObj(); hmDirty = true; updateAll();
     });
 
-    // ========================================================
-    // PRESET LAYOUTS
-    // ========================================================
+    // ============================================================
+    // PRESETS (dynamic player count)
+    // ============================================================
     window.applyPreset = function(preset) {
-      const layouts = {
-        semicircle: [
-          { x: -3.0, z: 3.5 },
-          { x: -1.0, z: 2.5 },
-          { x: 1.0, z: 2.5 },
-          { x: 3.0, z: 3.5 },
-        ],
-        tight: [
-          { x: -1.5, z: 2.0 },
-          { x: -0.5, z: 1.5 },
-          { x: 0.5, z: 1.5 },
-          { x: 1.5, z: 2.0 },
-        ],
-        diamond: [
-          { x: 0, z: 2.0 },
-          { x: -2.5, z: 3.5 },
-          { x: 0, z: 5.0 },
-          { x: 2.5, z: 3.5 },
-        ],
-        line: [
-          { x: -3.0, z: 3.0 },
-          { x: -1.0, z: 3.0 },
-          { x: 1.0, z: 3.0 },
-          { x: 3.0, z: 3.0 },
-        ],
-      };
-
-      const positions = layouts[preset];
-      if (!positions) return;
-
-      state.players.forEach((player, i) => {
-        player.position.x = positions[i].x;
-        player.position.z = positions[i].z;
-        // Auto-face toward mic
-        player.facing = Math.atan2(-player.position.x, -player.position.z);
+      const n = state.players.length;
+      if (n === 0) return;
+      state.players.forEach((p, i) => {
+        let angle, radius;
+        switch(preset) {
+          case 'semicircle': radius = 3.5; angle = n===1 ? 0 : -Math.PI/3 + (2*Math.PI/3)*(i/(n-1)); break;
+          case 'tight':      radius = 2.0; angle = n===1 ? 0 : -Math.PI/4 + (Math.PI/2)*(i/(n-1)); break;
+          case 'diamond':    radius = 2.5 + Math.abs(i - (n-1)/2)*1.2; angle = n===1 ? 0 : -Math.PI/4 + (Math.PI/2)*(i/(n-1)); break;
+          case 'line':       radius = 3.0; angle = n===1 ? 0 : -Math.PI/3 + (2*Math.PI/3)*(i/(n-1)); p.position.z = 3; p.position.x = -3 + 6*(i/(n-1||1)); break;
+        }
+        if (preset !== 'line') { p.position.x = radius * Math.sin(angle); p.position.z = radius * Math.cos(angle); }
+        const f = Math.atan2(-p.position.x, -p.position.z);
+        p.bodyFacing = f; p.voiceFacing = f; p.instrumentFacing = f;
       });
-
-      updateAll();
+      rebuildAll();
     };
 
-    // ========================================================
+    // ============================================================
     // VIEW TOGGLE
-    // ========================================================
-    window.setView = function(view) {
-      document.querySelectorAll('.view-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.view === view);
-      });
-
-      if (view === 'top') {
-        camera.position.set(0, 18, 0.01);
-        orbitControls.target.set(0, 0, 2);
-      } else {
-        camera.position.set(0, 14, -10);
-        orbitControls.target.set(0, 0, 2);
-      }
+    // ============================================================
+    window.setView = function(v) {
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view===v));
+      if (v === 'top') { camera.position.set(0, 20, 0.01); orbitControls.target.set(0, 0, 2); }
+      else { camera.position.set(0, 14, -10); orbitControls.target.set(0, 0, 2); }
       orbitControls.update();
     };
 
-    // ========================================================
+    // ============================================================
     // HEATMAP REFRESH
-    // ========================================================
-    let heatmapDirty = false;
-    function refreshHeatmap() {
-      heatmapDirty = true;
+    // ============================================================
+    let hmDirty = false;
+    function refreshHm() {
+      hmTex.image = generateHeatmap();
+      hmTex.needsUpdate = true;
+      hmDirty = false;
     }
 
-    function doRefreshHeatmap() {
-      const canvas = generateHeatmap();
-      heatmapTexture.image = canvas;
-      heatmapTexture.needsUpdate = true;
-      heatmapDirty = false;
-    }
-
-    // ========================================================
+    // ============================================================
     // MASTER UPDATE
-    // ========================================================
+    // ============================================================
     function updateAll() {
       computeMixLevels();
-      updatePlayerObjects();
-      createSignalLines();
-      updateMixMetersUI();
+      updatePlayers3D();
+      updateSignalLines();
+      updateDirectivityViz();
+      updateUI();
+      saveState();
     }
 
-    // ========================================================
-    // WINDOW RESIZE
-    // ========================================================
+    // ============================================================
+    // RESIZE
+    // ============================================================
     window.addEventListener('resize', () => {
-      const w = viewport.clientWidth;
-      const h = viewport.clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-      labelRenderer.setSize(w, h);
+      const w = viewport.clientWidth, h = viewport.clientHeight;
+      camera.aspect = w/h; camera.updateProjectionMatrix();
+      renderer.setSize(w, h); labelRenderer.setSize(w, h);
     });
 
-    // ========================================================
-    // ANIMATION LOOP
-    // ========================================================
+    // ============================================================
+    // ANIMATION
+    // ============================================================
     function animate() {
       requestAnimationFrame(animate);
       orbitControls.update();
-
-      if (heatmapDirty) doRefreshHeatmap();
-
+      if (hmDirty) refreshHm();
+      if (state.solverRunning) { for (let i=0;i<3;i++) solverStep(); updateAll(); buildPlayerCards(); }
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
     }
 
-    // ========================================================
-    // INITIALIZATION
-    // ========================================================
-    buildPlayerCards();
-    buildMixMeters();
-    updateMicObject();
-    updateCardioidRotation();
-    computeMixLevels();
-    createSignalLines();
-    updateMixMetersUI();
-    animate();
-
-    // Save/restore positions from localStorage
-    function savePositions() {
-      const data = state.players.map(p => ({
-        x: p.position.x, z: p.position.z, facing: p.facing,
-        instrumentSPL: p.instrumentSPL, voiceSPL: p.voiceSPL, singing: p.singing,
-      }));
-      localStorage.setItem('mic_plot_positions', JSON.stringify(data));
-      localStorage.setItem('mic_plot_mic', JSON.stringify(state.mic));
-    }
-
-    function loadPositions() {
+    // ============================================================
+    // SAVE / LOAD
+    // ============================================================
+    function saveState() {
       try {
-        const data = JSON.parse(localStorage.getItem('mic_plot_positions'));
-        const micData = JSON.parse(localStorage.getItem('mic_plot_mic'));
-        if (data && data.length === state.players.length) {
-          data.forEach((d, i) => {
-            state.players[i].position.x = d.x;
-            state.players[i].position.z = d.z;
-            state.players[i].facing = d.facing;
-            state.players[i].instrumentSPL = d.instrumentSPL;
-            state.players[i].voiceSPL = d.voiceSPL;
-            state.players[i].singing = d.singing;
-          });
-        }
-        if (micData) {
-          Object.assign(state.mic, micData);
+        localStorage.setItem('mic_plot_v3', JSON.stringify({
+          mic: state.mic,
+          players: state.players.map(p => ({ ...p, position: { ...p.position } })),
+        }));
+      } catch(e) {}
+    }
+    function loadState() {
+      try {
+        const d = JSON.parse(localStorage.getItem('mic_plot_v3'));
+        if (d && d.players && d.players.length > 0) {
+          state.players = d.players.map(p => ({ ...p, position: { ...p.position } }));
+          Object.assign(state.mic, d.mic);
           document.getElementById('mic-height').value = state.mic.height;
           document.getElementById('mic-height-val').textContent = `${state.mic.height.toFixed(1)} ft`;
           document.getElementById('mic-gain').value = state.mic.gain;
           document.getElementById('mic-gain-val').textContent = `${state.mic.gain} dB`;
           document.getElementById('mic-rotation').value = state.mic.rotation;
-          document.getElementById('mic-rotation-val').textContent = `${state.mic.rotation}°`;
+          document.getElementById('mic-rotation-val').textContent = `${state.mic.rotation}\u00B0`;
         }
-        // Rebuild UI with loaded values
-        buildPlayerCards();
-        buildMixMeters();
-        updateMicObject();
-        updateCardioidRotation();
-        refreshHeatmap();
-        updateAll();
-      } catch (e) { /* ignore corrupt data */ }
+      } catch(e) {}
     }
 
-    // Auto-save on changes
-    const _origUpdateAll = updateAll;
-    updateAll = function() {
-      _origUpdateAll();
-      savePositions();
-    };
+    // ============================================================
+    // INIT
+    // ============================================================
+    // Populate instrument dropdown
+    const instSel = document.getElementById('new-inst');
+    Object.keys(INSTRUMENTS).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = INSTRUMENTS[k].label; instSel.appendChild(o); });
 
-    // Try to load saved state
-    loadPositions();
+    loadState();
+    buildPlayers3D();
+    buildPlayerCards();
+    buildMixMeters();
+    updateMicObj();
+    computeMixLevels();
+    updateSignalLines();
+    updateUI();
+    animate();
 
-    console.log('Bluegrass Mic Plot loaded. Drag players to reposition them on the stage.');
+    console.log('Bluegrass Mic Plot v3 loaded.');
   </script>
 </body>
 </html>

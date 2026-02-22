@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mic Plot — Simulation Tests</title>
+  <style>
+    body { font-family: 'SF Mono','Fira Code',monospace; background: #0d1117; color: #e6edf3; padding: 24px; font-size: 13px; line-height: 1.6; }
+    h1 { font-size: 18px; margin-bottom: 16px; }
+    .suite { margin-bottom: 24px; }
+    .suite-title { font-size: 14px; font-weight: 700; color: #58a6ff; margin-bottom: 8px; border-bottom: 1px solid #30363d; padding-bottom: 4px; }
+    .pass { color: #3fb950; }
+    .fail { color: #f85149; }
+    .test-line { margin: 2px 0; }
+    .summary { margin-top: 24px; padding: 12px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; }
+    .summary.all-pass { background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
+    .summary.has-fail { background: rgba(248,81,73,0.15); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
+  </style>
+</head>
+<body>
+  <h1>Bluegrass Mic Plot — Simulation Tests</h1>
+  <div id="results"></div>
+
+  <script type="module">
+    // ============================================================
+    // REPLICATE SIMULATION ENGINE (no Three.js dependency)
+    // ============================================================
+    const FT_PER_M = 3.28084;
+    const MIN_DB = -40;
+    const PLAYER_RADIUS = 1.25;
+
+    const INSTRUMENTS = {
+      banjo:    { label:'Banjo',           dir:0.60, spl:88, hFrac:0.57 },
+      guitar:   { label:'Guitar',          dir:0.55, spl:82, hFrac:0.56 },
+      bass:     { label:'Stand-up Bass',   dir:0.80, spl:78, hFrac:0.47 },
+      mandolin: { label:'F-style Mandolin',dir:0.55, spl:84, hFrac:0.58 },
+      fiddle:   { label:'Fiddle',          dir:0.65, spl:85, hFrac:0.72 },
+      dobro:    { label:'Dobro',           dir:0.55, spl:83, hFrac:0.54 },
+      vocals:   { label:'Vocals Only',     dir:1.00, spl:0,  hFrac:0.50 },
+    };
+    const VOICE = { dir: 0.50, spl: 80, hOff: -0.5 };
+
+    // Vector3 minimal implementation
+    class Vec3 {
+      constructor(x=0, y=0, z=0) { this.x=x; this.y=y; this.z=z; }
+      sub(v) { return new Vec3(this.x-v.x, this.y-v.y, this.z-v.z); }
+      normalize() {
+        const len = Math.sqrt(this.x**2 + this.y**2 + this.z**2);
+        if (len < 1e-10) return new Vec3(0,0,0);
+        return new Vec3(this.x/len, this.y/len, this.z/len);
+      }
+      dot(v) { return this.x*v.x + this.y*v.y + this.z*v.z; }
+      distanceTo(v) { return Math.sqrt((this.x-v.x)**2 + (this.y-v.y)**2 + (this.z-v.z)**2); }
+    }
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const linToDb = l => l <= 0 ? MIN_DB : 20 * Math.log10(l);
+    const dirGain = (theta, a) => a + (1 - a) * Math.cos(theta);
+    const micGain = theta => Math.max(0.001, 0.5 + 0.5 * Math.cos(theta));
+    const angBetween = (a, b) => Math.acos(clamp(a.dot(b), -1, 1));
+    const deg2r = d => d * Math.PI / 180;
+
+    function resolveInstHeight(p) { return p.instrumentHeight ?? (p.height * INSTRUMENTS[p.instrument].hFrac); }
+    function resolveVoiceHeight(p) { return p.voiceHeight ?? (p.height + VOICE.hOff); }
+
+    function micFwd(rotation) {
+      const a = deg2r(rotation);
+      return new Vec3(Math.sin(a), 0, Math.cos(a));
+    }
+
+    function computeMixForPlayer(player, mic) {
+      const mPos = new Vec3(0, mic.height, 0);
+      const mFwd = micFwd(mic.rotation);
+      const inst = INSTRUMENTS[player.instrument];
+      const vH = resolveVoiceHeight(player);
+      const iH = resolveInstHeight(player);
+
+      const vFwd = new Vec3(Math.sin(player.voiceFacing), 0, Math.cos(player.voiceFacing));
+      const iFwd = new Vec3(Math.sin(player.instrumentFacing), 0, Math.cos(player.instrumentFacing));
+
+      // Voice
+      let voiceLevel = MIN_DB;
+      const vPos = new Vec3(player.position.x, vH, player.position.z);
+      if (player.singing) {
+        const vToMic = mPos.sub(vPos).normalize();
+        const distV = vPos.distanceTo(mPos);
+        const vAngle = angBetween(vFwd, vToMic);
+        const vGainVal = dirGain(vAngle, VOICE.dir);
+        const micToV = vPos.sub(mPos).normalize();
+        const mAngle = angBetween(mFwd, micToV);
+        const mGainVal = micGain(mAngle);
+        voiceLevel = player.voiceSPL - 20*Math.log10(distV/FT_PER_M) + linToDb(vGainVal) + linToDb(mGainVal) + mic.gain;
+      }
+
+      // Instrument
+      const iPos = new Vec3(player.position.x, iH, player.position.z);
+      const iToMic = mPos.sub(iPos).normalize();
+      const distI = iPos.distanceTo(mPos);
+      const iAngle = angBetween(iFwd, iToMic);
+      const iGainVal = dirGain(iAngle, inst.dir);
+      const micToI = iPos.sub(mPos).normalize();
+      const mAngleI = angBetween(mFwd, micToI);
+      const mGainI = micGain(mAngleI);
+      const instrumentLevel = player.instrumentSPL - 20*Math.log10(distI/FT_PER_M) + linToDb(iGainVal) + linToDb(mGainI) + mic.gain;
+
+      // Combined
+      const vLin = Math.pow(10, Math.max(MIN_DB, voiceLevel) / 10);
+      const iLin = Math.pow(10, Math.max(MIN_DB, instrumentLevel) / 10);
+      const combined = 10 * Math.log10(vLin + iLin);
+
+      return {
+        voiceLevel: Math.max(MIN_DB, voiceLevel),
+        instrumentLevel: Math.max(MIN_DB, instrumentLevel),
+        combinedLevel: Math.max(MIN_DB, combined),
+        distI,
+      };
+    }
+
+    function makePlayer(name, inst, heightFt, x, z) {
+      const facing = Math.atan2(-x, -z);
+      return {
+        name, instrument: inst, height: heightFt,
+        position: { x, z },
+        bodyFacing: facing, voiceFacing: facing, instrumentFacing: facing,
+        instrumentSPL: INSTRUMENTS[inst].spl, voiceSPL: VOICE.spl,
+        singing: true,
+        instrumentHeight: null, voiceHeight: null,
+      };
+    }
+
+    // ============================================================
+    // TEST HARNESS
+    // ============================================================
+    let totalTests = 0, passedTests = 0, failedTests = 0;
+    const resultsEl = document.getElementById('results');
+    let currentSuiteEl = null;
+
+    function suite(name) {
+      const div = document.createElement('div');
+      div.className = 'suite';
+      div.innerHTML = `<div class="suite-title">${name}</div>`;
+      resultsEl.appendChild(div);
+      currentSuiteEl = div;
+    }
+
+    function assert(name, condition, detail='') {
+      totalTests++;
+      const line = document.createElement('div');
+      line.className = 'test-line';
+      if (condition) {
+        passedTests++;
+        line.innerHTML = `<span class="pass">PASS</span> ${name}`;
+      } else {
+        failedTests++;
+        line.innerHTML = `<span class="fail">FAIL</span> ${name}${detail ? ` — ${detail}` : ''}`;
+      }
+      currentSuiteEl.appendChild(line);
+    }
+
+    function assertApprox(name, actual, expected, tolerance=0.5) {
+      const ok = Math.abs(actual - expected) <= tolerance;
+      assert(name, ok, ok ? '' : `expected ~${expected}, got ${actual.toFixed(3)}`);
+    }
+
+    function assertGreater(name, a, b) {
+      assert(name, a > b, `expected ${a.toFixed(3)} > ${b.toFixed(3)}`);
+    }
+
+    function assertLess(name, a, b) {
+      assert(name, a < b, `expected ${a.toFixed(3)} < ${b.toFixed(3)}`);
+    }
+
+    // ============================================================
+    // TEST: Mic Polar Pattern
+    // ============================================================
+    suite('Mic Polar Pattern (Cardioid)');
+    {
+      // On-axis (0 degrees) = full gain
+      assertApprox('On-axis gain = 1.0', micGain(0), 1.0, 0.001);
+
+      // 60 degrees off-axis ≈ -3 dB (gain ~0.75)
+      assertApprox('60° off-axis gain ≈ 0.75', micGain(deg2r(60)), 0.75, 0.01);
+
+      // 90 degrees off-axis = -6 dB (gain = 0.5)
+      assertApprox('90° off-axis gain = 0.5', micGain(deg2r(90)), 0.5, 0.001);
+
+      // 120 degrees off-axis (gain = 0.25)
+      assertApprox('120° off-axis gain = 0.25', micGain(deg2r(120)), 0.25, 0.01);
+
+      // 180 degrees (rear null)
+      const rearGain = micGain(deg2r(180));
+      assert('180° rear gain ≈ 0 (clamped to 0.001)', rearGain <= 0.01, `got ${rearGain.toFixed(4)}`);
+
+      // Symmetry
+      assertApprox('Symmetric: -45° = +45°', micGain(deg2r(-45)), micGain(deg2r(45)), 0.001);
+    }
+
+    // ============================================================
+    // TEST: Instrument Directivity
+    // ============================================================
+    suite('Instrument Directivity Patterns');
+    {
+      // Banjo (dir=0.60): max at 0°, reduced at back
+      const banjoFront = dirGain(0, 0.60);
+      const banjoSide = dirGain(deg2r(90), 0.60);
+      const banjoBack = dirGain(deg2r(180), 0.60);
+      assertApprox('Banjo on-axis = 1.0', banjoFront, 1.0, 0.001);
+      assertApprox('Banjo 90° = dir param (0.60)', banjoSide, 0.60, 0.001);
+      assertApprox('Banjo 180° = 2*dir-1 (0.20)', banjoBack, 0.20, 0.001);
+
+      // Bass (dir=0.80): nearly omnidirectional
+      const bassFront = dirGain(0, 0.80);
+      const bassBack = dirGain(deg2r(180), 0.80);
+      assertApprox('Bass on-axis = 1.0', bassFront, 1.0, 0.001);
+      assertApprox('Bass 180° = 0.60 (nearly omni)', bassBack, 0.60, 0.001);
+
+      // Vocals (dir=0.50): cardioid-like
+      const voiceFront = dirGain(0, VOICE.dir);
+      const voiceSide = dirGain(deg2r(90), VOICE.dir);
+      const voiceBack = dirGain(deg2r(180), VOICE.dir);
+      assertApprox('Voice on-axis = 1.0', voiceFront, 1.0, 0.001);
+      assertApprox('Voice 90° = 0.50', voiceSide, 0.50, 0.001);
+      assertApprox('Voice 180° = 0.0 (null)', voiceBack, 0.0, 0.01);
+    }
+
+    // ============================================================
+    // TEST: Distance affects level (inverse square law)
+    // ============================================================
+    suite('Distance Affects Level (Inverse Square Law)');
+    {
+      const mic = { height: 5.0, gain: 0, rotation: 0 };
+
+      // Player at 3 ft directly in front
+      const near = makePlayer('Near', 'guitar', 5.83, 0, 3);
+      const nearMix = computeMixForPlayer(near, mic);
+
+      // Same player at 6 ft directly in front
+      const far = makePlayer('Far', 'guitar', 5.83, 0, 6);
+      const farMix = computeMixForPlayer(far, mic);
+
+      assertGreater('Nearer player has higher instrument level', nearMix.instrumentLevel, farMix.instrumentLevel);
+      assertGreater('Nearer player has higher combined level', nearMix.combinedLevel, farMix.combinedLevel);
+
+      // Inverse square: doubling distance should drop ~6 dB
+      const instDiff = nearMix.instrumentLevel - farMix.instrumentLevel;
+      assertApprox('~6 dB drop for 2x distance (instrument)', instDiff, 6.0, 2.0);
+    }
+
+    // ============================================================
+    // TEST: Mic angle affects level
+    // ============================================================
+    suite('Mic Angle Affects Level');
+    {
+      const mic = { height: 5.0, gain: 0, rotation: 0 };
+
+      // Player directly in front (z > 0, on-axis)
+      const front = makePlayer('Front', 'guitar', 5.83, 0, 4);
+      const frontMix = computeMixForPlayer(front, mic);
+
+      // Player at 90° off-axis (same distance)
+      const side = makePlayer('Side', 'guitar', 5.83, 4, 0);
+      const sideMix = computeMixForPlayer(side, mic);
+
+      // Player behind mic
+      const back = makePlayer('Back', 'guitar', 5.83, 0, -4);
+      const backMix = computeMixForPlayer(back, mic);
+
+      assertGreater('On-axis louder than off-axis', frontMix.instrumentLevel, sideMix.instrumentLevel);
+      assertGreater('Off-axis louder than behind', sideMix.instrumentLevel, backMix.instrumentLevel);
+
+      // The instrument level difference between front and side should be meaningful
+      const angleDiff = frontMix.instrumentLevel - sideMix.instrumentLevel;
+      assertGreater('Front-to-side difference > 2 dB', angleDiff, 2);
+    }
+
+    // ============================================================
+    // TEST: Mic rotation changes pickup direction
+    // ============================================================
+    suite('Mic Rotation');
+    {
+      const mic0 = { height: 5.0, gain: 0, rotation: 0 };
+      const mic90 = { height: 5.0, gain: 0, rotation: 90 };
+
+      // Player at (4, z=0): off to the right
+      const p = makePlayer('Right', 'guitar', 5.83, 4, 0);
+
+      const mixDefault = computeMixForPlayer(p, mic0);    // Player is 90° off-axis
+      const mixRotated = computeMixForPlayer(p, mic90);   // Mic now points at player
+
+      assertGreater('Rotating mic toward player increases level', mixRotated.instrumentLevel, mixDefault.instrumentLevel);
+    }
+
+    // ============================================================
+    // TEST: Player facing direction affects level
+    // ============================================================
+    suite('Player Facing Direction');
+    {
+      const mic = { height: 5.0, gain: 0, rotation: 0 };
+
+      // Player in front, facing mic (facing toward negative Z / toward mic at origin)
+      const facingMic = makePlayer('FacingMic', 'banjo', 5.83, 0, 4);
+      facingMic.instrumentFacing = Math.atan2(0, -1); // facing toward -Z (toward mic)
+      const mixFacing = computeMixForPlayer(facingMic, mic);
+
+      // Same player, facing away from mic
+      const facingAway = makePlayer('FacingAway', 'banjo', 5.83, 0, 4);
+      facingAway.instrumentFacing = Math.atan2(0, 1); // facing toward +Z (away from mic)
+      const mixAway = computeMixForPlayer(facingAway, mic);
+
+      assertGreater('Facing mic louder than facing away', mixFacing.instrumentLevel, mixAway.instrumentLevel);
+
+      // The difference should be significant for banjo (dir=0.60)
+      const facingDiff = mixFacing.instrumentLevel - mixAway.instrumentLevel;
+      assertGreater('Facing difference > 3 dB for banjo', facingDiff, 3);
+    }
+
+    // ============================================================
+    // TEST: Singing toggle
+    // ============================================================
+    suite('Singing Toggle');
+    {
+      const mic = { height: 5.0, gain: 0, rotation: 0 };
+
+      const singing = makePlayer('Singer', 'guitar', 5.83, 0, 3);
+      singing.singing = true;
+      const mixSinging = computeMixForPlayer(singing, mic);
+
+      const notSinging = makePlayer('NoSing', 'guitar', 5.83, 0, 3);
+      notSinging.singing = false;
+      const mixNoSing = computeMixForPlayer(notSinging, mic);
+
+      assertGreater('Singing adds to combined level', mixSinging.combinedLevel, mixNoSing.combinedLevel);
+      assertApprox('Non-singing voice = MIN_DB', mixNoSing.voiceLevel, MIN_DB, 0.01);
+      assertApprox('Singing and non-singing have same instrument level', mixSinging.instrumentLevel, mixNoSing.instrumentLevel, 0.01);
+    }
+
+    // ============================================================
+    // TEST: Mic gain control
+    // ============================================================
+    suite('Mic Gain Control');
+    {
+      const micLow = { height: 5.0, gain: -10, rotation: 0 };
+      const micHigh = { height: 5.0, gain: 10, rotation: 0 };
+
+      const p = makePlayer('Test', 'guitar', 5.83, 0, 3);
+      const mixLow = computeMixForPlayer(p, micLow);
+      const mixHigh = computeMixForPlayer(p, micHigh);
+
+      const gainDiff = mixHigh.combinedLevel - mixLow.combinedLevel;
+      assertApprox('20 dB gain change = 20 dB level change', gainDiff, 20.0, 1.0);
+    }
+
+    // ============================================================
+    // TEST: Source height affects distance calculation
+    // ============================================================
+    suite('Source Height Affects Distance');
+    {
+      const mic = { height: 5.0, gain: 0, rotation: 0 };
+
+      // Player close to mic height
+      const sameH = makePlayer('SameH', 'guitar', 5.5, 0, 3);
+      sameH.instrumentHeight = 5.0; // same as mic
+      const mixSameH = computeMixForPlayer(sameH, mic);
+
+      // Player with instrument near floor
+      const lowH = makePlayer('LowH', 'guitar', 5.5, 0, 3);
+      lowH.instrumentHeight = 1.0; // far below mic
+      const mixLowH = computeMixForPlayer(lowH, mic);
+
+      assertGreater('Instrument at mic height louder than near floor', mixSameH.instrumentLevel, mixLowH.instrumentLevel);
+    }
+
+    // ============================================================
+    // TEST: Power sum (combined level)
+    // ============================================================
+    suite('Power Sum Combination');
+    {
+      const mic = { height: 5.0, gain: 0, rotation: 0 };
+      const p = makePlayer('Test', 'guitar', 5.83, 0, 3);
+      p.singing = true;
+      const mix = computeMixForPlayer(p, mic);
+
+      // Combined should always be >= max(voice, instrument)
+      assertGreater('Combined >= instrument level',
+        mix.combinedLevel + 0.001, // tiny epsilon for floating point
+        mix.instrumentLevel
+      );
+      assertGreater('Combined >= voice level',
+        mix.combinedLevel + 0.001,
+        mix.voiceLevel
+      );
+
+      // Combined should be < max + 3 dB (two equal sources = +3 dB)
+      const maxSource = Math.max(mix.voiceLevel, mix.instrumentLevel);
+      assertLess('Combined < max + 3.1 dB', mix.combinedLevel, maxSource + 3.1);
+    }
+
+    // ============================================================
+    // TEST: Default band sanity check
+    // ============================================================
+    suite('Default Band Configuration');
+    {
+      const mic = { height: 5.0, gain: 0, rotation: 0 };
+      const band = [
+        makePlayer('Mike',   'banjo',    6+2/12,  -2.0, 3.0),
+        makePlayer('Tim',    'guitar',   5+8/12,   2.0, 3.0),
+        makePlayer('Matt',   'bass',     6+5/12,   0.0, 4.5),
+        makePlayer('Robert', 'mandolin', 6+5/12,   3.0, 3.5),
+      ];
+
+      const levels = band.map(p => computeMixForPlayer(p, mic));
+
+      // All levels should be above noise floor
+      levels.forEach((m, i) => {
+        assertGreater(`${band[i].name} instrument above -30 dB`, m.instrumentLevel, -30);
+        assertGreater(`${band[i].name} voice above -30 dB`, m.voiceLevel, -30);
+        assertGreater(`${band[i].name} combined above -25 dB`, m.combinedLevel, -25);
+      });
+
+      // Spread should be reasonable (not crazy)
+      const combined = levels.map(m => m.combinedLevel);
+      const spread = Math.max(...combined) - Math.min(...combined);
+      assertLess('Default band spread < 15 dB', spread, 15);
+
+      // Distance from mic should be reasonable
+      levels.forEach((m, i) => {
+        assertGreater(`${band[i].name} distance > 2 ft`, m.distI, 2);
+        assertLess(`${band[i].name} distance < 10 ft`, m.distI, 10);
+      });
+    }
+
+    // ============================================================
+    // TEST: Solver constraints
+    // ============================================================
+    suite('Solver Constraints');
+    {
+      const SOLVER_MIN_MIC_DIST = 2.5;
+      const SOLVER_MAX_MIC_DIST = 8.0;
+      const SOLVER_MIN_PLAYER_DIST = PLAYER_RADIUS * 2 + 1.0;
+      const SOLVER_MIN_Z = 1.5;
+      const STAGE_SIZE = 24;
+
+      function enforceConstraints(players) {
+        const half = STAGE_SIZE/2 - 1;
+        for (const p of players) {
+          const distFromMic = Math.sqrt(p.position.x**2 + p.position.z**2);
+          if (distFromMic < SOLVER_MIN_MIC_DIST) {
+            const scale = SOLVER_MIN_MIC_DIST / Math.max(distFromMic, 0.01);
+            p.position.x *= scale; p.position.z *= scale;
+          }
+          if (distFromMic > SOLVER_MAX_MIC_DIST) {
+            const scale = SOLVER_MAX_MIC_DIST / distFromMic;
+            p.position.x *= scale; p.position.z *= scale;
+          }
+          p.position.z = Math.max(SOLVER_MIN_Z, p.position.z);
+          p.position.x = clamp(p.position.x, -half, half);
+          p.position.z = clamp(p.position.z, SOLVER_MIN_Z, half);
+        }
+        for (let pass = 0; pass < 3; pass++) {
+          for (let i = 0; i < players.length; i++) {
+            for (let j = i+1; j < players.length; j++) {
+              const a = players[i].position, b = players[j].position;
+              const dx = b.x - a.x, dz = b.z - a.z;
+              const dist = Math.sqrt(dx*dx + dz*dz);
+              if (dist < SOLVER_MIN_PLAYER_DIST && dist > 0.01) {
+                const push = (SOLVER_MIN_PLAYER_DIST - dist) / 2;
+                const nx = dx/dist, nz = dz/dist;
+                a.x -= nx*push; a.z -= nz*push;
+                b.x += nx*push; b.z += nz*push;
+              }
+            }
+          }
+        }
+        for (const p of players) {
+          const distFromMic = Math.sqrt(p.position.x**2 + p.position.z**2);
+          if (distFromMic < SOLVER_MIN_MIC_DIST) {
+            const scale = SOLVER_MIN_MIC_DIST / Math.max(distFromMic, 0.01);
+            p.position.x *= scale; p.position.z *= scale;
+          }
+          p.position.z = Math.max(SOLVER_MIN_Z, p.position.z);
+          p.position.x = clamp(p.position.x, -half, half);
+          p.position.z = clamp(p.position.z, SOLVER_MIN_Z, half);
+        }
+      }
+
+      // Test: players too close to mic get pushed out
+      const tooClose = [
+        { position: { x: 0, z: 0.5 } },
+        { position: { x: 0.3, z: 0.3 } },
+      ];
+      enforceConstraints(tooClose);
+      tooClose.forEach((p, i) => {
+        const dist = Math.sqrt(p.position.x**2 + p.position.z**2);
+        assert(`Player ${i} pushed to >= ${SOLVER_MIN_MIC_DIST} ft from mic`, dist >= SOLVER_MIN_MIC_DIST - 0.1,
+          `dist = ${dist.toFixed(2)}`);
+      });
+
+      // Test: players too far get pulled in
+      const tooFar = [
+        { position: { x: 0, z: 15 } },
+        { position: { x: 10, z: 3 } },
+      ];
+      enforceConstraints(tooFar);
+      tooFar.forEach((p, i) => {
+        const dist = Math.sqrt(p.position.x**2 + p.position.z**2);
+        assert(`Player ${i} pulled to <= ${SOLVER_MAX_MIC_DIST} ft from mic`, dist <= SOLVER_MAX_MIC_DIST + 0.5,
+          `dist = ${dist.toFixed(2)}`);
+      });
+
+      // Test: overlapping players get separated
+      const overlapping = [
+        { position: { x: 0, z: 3 } },
+        { position: { x: 0, z: 3.1 } },
+        { position: { x: 0, z: 3.2 } },
+      ];
+      enforceConstraints(overlapping);
+      for (let i = 0; i < overlapping.length; i++) {
+        for (let j = i+1; j < overlapping.length; j++) {
+          const dx = overlapping[j].position.x - overlapping[i].position.x;
+          const dz = overlapping[j].position.z - overlapping[i].position.z;
+          const dist = Math.sqrt(dx*dx + dz*dz);
+          assert(`Players ${i},${j} separated >= ${SOLVER_MIN_PLAYER_DIST.toFixed(1)} ft`,
+            dist >= SOLVER_MIN_PLAYER_DIST - 0.3,
+            `dist = ${dist.toFixed(2)}`);
+        }
+      }
+
+      // Test: players always in front of mic
+      const behind = [
+        { position: { x: 0, z: -5 } },
+      ];
+      enforceConstraints(behind);
+      assert('Player behind mic moved to z >= SOLVER_MIN_Z',
+        behind[0].position.z >= SOLVER_MIN_Z - 0.01,
+        `z = ${behind[0].position.z.toFixed(2)}`);
+    }
+
+    // ============================================================
+    // TEST: Edge cases
+    // ============================================================
+    suite('Edge Cases');
+    {
+      const mic = { height: 5.0, gain: 0, rotation: 0 };
+
+      // Vocals-only instrument (SPL=0)
+      const vocalsOnly = makePlayer('VocalsOnly', 'vocals', 5.83, 0, 3);
+      vocalsOnly.singing = true;
+      const mixVocals = computeMixForPlayer(vocalsOnly, mic);
+      assert('Vocals-only player has valid combined level', !isNaN(mixVocals.combinedLevel) && mixVocals.combinedLevel > MIN_DB);
+
+      // Non-singing vocals-only (essentially silent)
+      const silent = makePlayer('Silent', 'vocals', 5.83, 0, 3);
+      silent.singing = false;
+      const mixSilent = computeMixForPlayer(silent, mic);
+      assert('Non-singing vocals-only has very low level', mixSilent.combinedLevel < -20,
+        `got ${mixSilent.combinedLevel.toFixed(1)}`);
+
+      // Very tall player
+      const tall = makePlayer('Tall', 'guitar', 7.0, 0, 3);
+      const mixTall = computeMixForPlayer(tall, mic);
+      assert('Very tall player has valid level', !isNaN(mixTall.combinedLevel));
+
+      // Player very far away
+      const distant = makePlayer('Distant', 'guitar', 5.83, 0, 11);
+      const mixDistant = computeMixForPlayer(distant, mic);
+      assert('Distant player level is very low', mixDistant.combinedLevel < -10);
+    }
+
+    // ============================================================
+    // SUMMARY
+    // ============================================================
+    const summaryEl = document.createElement('div');
+    summaryEl.className = `summary ${failedTests === 0 ? 'all-pass' : 'has-fail'}`;
+    summaryEl.textContent = failedTests === 0
+      ? `ALL ${totalTests} TESTS PASSED`
+      : `${failedTests} of ${totalTests} FAILED (${passedTests} passed)`;
+    resultsEl.appendChild(summaryEl);
+
+    console.log(`Tests: ${passedTests}/${totalTests} passed, ${failedTests} failed`);
+  </script>
+</body>
+</html>
