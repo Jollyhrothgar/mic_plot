@@ -128,10 +128,12 @@
         <div class="section-title">How To Use</div>
         <div class="help-text">
           <strong>Drag players</strong> to reposition on stage.<br>
-          <strong>Drag arrow tips</strong> to aim voice or instrument independently.<br>
-          <strong>Drag source markers</strong> (spheres) up/down to adjust source height.<br>
+          <strong>Drag red "Vox" arrow tip</strong> to aim singing direction.<br>
+          <strong>Drag colored "Inst" arrow tip</strong> to aim instrument direction.<br>
+          <strong>Drag source spheres</strong> up/down to adjust source height.<br>
+          <strong>Click a player</strong> to show directivity patterns.<br>
           <strong>Right-click drag</strong> to orbit camera. <strong>Scroll</strong> to zoom.<br><br>
-          The <strong>heatmap</strong> shows mic sensitivity. <strong>Auto Balance</strong> optimizes positions for even mix.<br><br>
+          The <strong>heatmap</strong> shows mic sensitivity on the floor. The <strong>cardioid outlines</strong> show the mic's pickup pattern (green=strong, yellow=moderate, red=weak).<br><br>
           <strong>Tip:</strong> Use a phone dB meter (NIOSH SLM, Decibel X) to measure each player at 1m.
         </div>
       </section>
@@ -602,7 +604,20 @@
     let playerLevelLabels = [];
 
     function clearPlayers3D() {
-      playerGroups.forEach(g => { scene.remove(g); g.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) { if (Array.isArray(c.material)) c.material.forEach(m=>m.dispose()); else c.material.dispose(); } }); });
+      playerGroups.forEach(g => {
+        scene.remove(g);
+        g.traverse(c => {
+          // Remove CSS2D label DOM elements to prevent ghost labels
+          if (c.isCSS2DObject && c.element && c.element.parentNode) {
+            c.element.parentNode.removeChild(c.element);
+          }
+          if (c.geometry) c.geometry.dispose();
+          if (c.material) {
+            if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+            else c.material.dispose();
+          }
+        });
+      });
       playerGroups = []; bodyHitTargets = []; sourceHitTargets = []; arrowTipTargets = []; playerLevelLabels = [];
     }
 
@@ -656,19 +671,37 @@
         grp.add(vMarker);
         sourceHitTargets.push(vMarker);
 
-        // Voice direction arrow (independent facing)
+        // Voice direction arrow (independent facing) — RED, long, big tip
         const vDir = voiceLocalDir(p);
-        const vArrow = new THREE.ArrowHelper(vDir, new THREE.Vector3(0, vH, 0), 2.0, 0xff6666, 0.35, 0.25);
+        const vArrow = new THREE.ArrowHelper(vDir, new THREE.Vector3(0, vH, 0), 3.0, 0xff4444, 0.6, 0.4);
         vArrow.cone.userData = { type: 'arrow', idx: i, facing: 'voice' };
         grp.add(vArrow);
         arrowTipTargets.push(vArrow.cone);
+        // Voice arrow tip label
+        const vTipD = document.createElement('div');
+        vTipD.className = 'label-3d';
+        vTipD.textContent = 'Vox';
+        vTipD.style.color = '#ff4444';
+        vTipD.style.fontSize = '9px';
+        const vTipL = new CSS2DObject(vTipD);
+        vTipL.position.copy(vDir.clone().multiplyScalar(3.3)).setY(vH);
+        grp.add(vTipL);
 
-        // Instrument direction arrow (independent facing)
+        // Instrument direction arrow (independent facing) — PLAYER COLOR, long, big tip
         const iDir = instLocalDir(p);
-        const iArrow = new THREE.ArrowHelper(iDir, new THREE.Vector3(0, iH, 0), 2.0, col.getHex(), 0.35, 0.25);
+        const iArrow = new THREE.ArrowHelper(iDir, new THREE.Vector3(0, iH, 0), 3.0, col.getHex(), 0.6, 0.4);
         iArrow.cone.userData = { type: 'arrow', idx: i, facing: 'instrument' };
         grp.add(iArrow);
         arrowTipTargets.push(iArrow.cone);
+        // Instrument arrow tip label
+        const iTipD = document.createElement('div');
+        iTipD.className = 'label-3d';
+        iTipD.textContent = 'Inst';
+        iTipD.style.color = p.color;
+        iTipD.style.fontSize = '9px';
+        const iTipL = new CSS2DObject(iTipD);
+        iTipL.position.copy(iDir.clone().multiplyScalar(3.3)).setY(iH);
+        grp.add(iTipL);
 
         // Name label
         const nd = document.createElement('div');
@@ -711,24 +744,32 @@
         grp.position.set(p.position.x, 0, p.position.z);
         grp.rotation.y = p.bodyFacing;
 
-        // Update arrow directions (compensate for group rotation)
-        const children = grp.children;
-        // Find arrows by iterating (voice arrow is first ArrowHelper, instrument is second)
-        let arrowCount = 0;
+        // Update arrow directions and tip labels
         const iH = resolveInstHeight(p);
         const vH = resolveVoiceHeight(p);
-        children.forEach(c => {
+        const vDir = voiceLocalDir(p);
+        const iDir = instLocalDir(p);
+        let arrowCount = 0;
+        let css2dCount = 0;
+        grp.children.forEach(c => {
           if (c.isArrowHelper) {
             if (arrowCount === 0) {
-              // Voice arrow
-              c.setDirection(voiceLocalDir(p));
+              c.setDirection(vDir);
               c.position.set(0, vH, 0);
             } else {
-              // Instrument arrow
-              c.setDirection(instLocalDir(p));
+              c.setDirection(iDir);
               c.position.set(0, iH, 0);
             }
             arrowCount++;
+          }
+          // Update tip label positions (Vox and Inst labels are 3rd and 4th CSS2DObjects)
+          if (c.isCSS2DObject) {
+            if (css2dCount === 2) { // Vox tip label
+              c.position.copy(vDir.clone().multiplyScalar(3.3)).setY(vH);
+            } else if (css2dCount === 3) { // Inst tip label
+              c.position.copy(iDir.clone().multiplyScalar(3.3)).setY(iH);
+            }
+            css2dCount++;
           }
         });
 
@@ -753,7 +794,7 @@
     // ============================================================
     let signalLines = [];
     function updateSignalLines() {
-      signalLines.forEach(l => scene.remove(l));
+      signalLines.forEach(l => { scene.remove(l); l.geometry.dispose(); l.material.dispose(); });
       signalLines = [];
       const mPos = new THREE.Vector3(0, state.mic.height, 0);
 
@@ -828,8 +869,8 @@
     }
 
     function updateDirectivityViz() {
-      // Remove old
-      directivityMeshes.forEach(m => scene.remove(m));
+      // Remove old (dispose geometry/material to prevent leaks)
+      directivityMeshes.forEach(m => { scene.remove(m); if (m.geometry) m.geometry.dispose(); if (m.material) m.material.dispose(); });
       directivityMeshes = [];
 
       const idx = state.selectedPlayer;
