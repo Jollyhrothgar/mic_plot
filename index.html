@@ -106,6 +106,7 @@
           <button class="preset-btn" onclick="applyPreset('diamond')">Diamond</button>
           <button class="preset-btn" onclick="applyPreset('line')">Line</button>
           <button class="solver-btn" id="solver-btn" onclick="toggleSolver()">Auto Balance</button>
+          <div class="unit-toggle" id="face-toggle"><button class="active" data-m="face" onclick="setFaceMode(true)">Face Mic</button><button data-m="lock" onclick="setFaceMode(false)">Lock Dir</button></div>
         </div>
       </section>
       <section id="players-section">
@@ -212,6 +213,7 @@
       dragExtra: null, // sourceType or facingType
       selectedPlayer: -1, // for showing directivity shapes
       solverRunning: false, solverIter: 0,
+      faceMic: true,
     };
 
     // ============================================================
@@ -419,7 +421,8 @@
       // Auto-face mic
       for (const p of state.players) {
         const f = Math.atan2(-p.position.x, -p.position.z);
-        p.bodyFacing = f; p.voiceFacing = f; p.instrumentFacing = f;
+        p.bodyFacing = f;
+        if (state.faceMic) { p.voiceFacing = f; p.instrumentFacing = f; }
       }
       state.solverIter++;
     }
@@ -1096,7 +1099,8 @@
         p.position.x = clamp(isect.x, -half, half);
         p.position.z = clamp(isect.z, -half, half);
         const f = Math.atan2(-p.position.x, -p.position.z);
-        p.bodyFacing = f; p.voiceFacing = f; p.instrumentFacing = f;
+        p.bodyFacing = f;
+        if (state.faceMic) { p.voiceFacing = f; p.instrumentFacing = f; }
         updateAll();
       } else if (state.dragMode === 'source') {
         raycaster.ray.intersectPlane(vertPlane, isect);
@@ -1360,6 +1364,12 @@
       updateAll();
     };
 
+    window.setFaceMode = function(fm) {
+      state.faceMic = fm;
+      document.querySelectorAll('#face-toggle button').forEach(b => b.classList.toggle('active', fm ? b.dataset.m === 'face' : b.dataset.m === 'lock'));
+      saveState();
+    };
+
     window.addNewPlayer = function() {
       const name = document.getElementById('new-name').value.trim() || `Player ${state.players.length+1}`;
       const inst = document.getElementById('new-inst').value;
@@ -1424,7 +1434,8 @@
         }
         if (preset !== 'line') { p.position.x = radius * Math.sin(angle); p.position.z = radius * Math.cos(angle); }
         const f = Math.atan2(-p.position.x, -p.position.z);
-        p.bodyFacing = f; p.voiceFacing = f; p.instrumentFacing = f;
+        p.bodyFacing = f;
+        if (state.faceMic) { p.voiceFacing = f; p.instrumentFacing = f; }
       });
       rebuildAll();
     };
@@ -1490,6 +1501,7 @@
         localStorage.setItem('mic_plot_v3', JSON.stringify({
           mic: state.mic,
           metric: state.metric,
+          faceMic: state.faceMic,
           players: state.players.map(p => ({ ...p, position: { ...p.position } })),
         }));
       } catch(e) {}
@@ -1501,14 +1513,16 @@
           state.players = d.players.map(p => ({ ...p, position: { ...p.position } }));
           Object.assign(state.mic, d.mic);
           if (d.metric !== undefined) state.metric = d.metric;
+          if (d.faceMic !== undefined) state.faceMic = d.faceMic;
           document.getElementById('mic-height').value = state.mic.height;
           document.getElementById('mic-height-val').textContent = fmtDist(state.mic.height);
           document.getElementById('mic-gain').value = state.mic.gain;
           document.getElementById('mic-gain-val').textContent = `${state.mic.gain} dB`;
           document.getElementById('mic-rotation').value = state.mic.rotation;
           document.getElementById('mic-rotation-val').textContent = `${state.mic.rotation}\u00B0`;
-          // Restore unit toggle UI
+          // Restore toggle UIs
           document.querySelectorAll('#unit-toggle button').forEach(b => b.classList.toggle('active', b.dataset.u === (state.metric ? 'metric' : 'imperial')));
+          document.querySelectorAll('#face-toggle button').forEach(b => b.classList.toggle('active', state.faceMic ? b.dataset.m === 'face' : b.dataset.m === 'lock'));
         }
       } catch(e) {}
     }
