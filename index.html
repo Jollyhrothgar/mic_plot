@@ -68,6 +68,9 @@
     .view-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
     .help-text { font-size: 10px; color: var(--text-muted); line-height: 1.5; }
     .help-text strong { color: var(--text); }
+    .unit-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; margin-left: auto; font-size: 10px; }
+    .unit-toggle button { padding: 3px 8px; border: none; background: var(--card-bg); color: var(--text-muted); cursor: pointer; font-size: 10px; }
+    .unit-toggle button.active { background: var(--accent); color: #fff; }
     .label-3d { font-size: 11px; font-weight: 600; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.8); pointer-events: none; white-space: nowrap; }
     .label-3d-level { font-size: 10px; font-family: 'SF Mono','Fira Code','Consolas',monospace; color: #aaa; text-shadow: 0 1px 4px rgba(0,0,0,0.9); pointer-events: none; }
     .label-distance { font-size: 9px; color: #555; font-family: 'SF Mono','Fira Code','Consolas',monospace; text-shadow: 0 1px 3px rgba(0,0,0,0.8); pointer-events: none; }
@@ -90,8 +93,8 @@
         </div>
       </div>
       <section id="mic-settings">
-        <div class="section-title">Microphone</div>
-        <div class="control-row"><label>Height</label><input type="range" id="mic-height" min="3" max="7" step="0.1" value="5"><span class="value" id="mic-height-val">5.0 ft</span></div>
+        <div class="section-title" style="display:flex;align-items:center">Microphone<div class="unit-toggle" id="unit-toggle"><button class="active" data-u="imperial" onclick="setUnits('imperial')">ft/in</button><button data-u="metric" onclick="setUnits('metric')">m/cm</button></div></div>
+        <div class="control-row"><label>Height</label><input type="range" id="mic-height" min="3" max="7" step="0.1" value="5"><span class="value" id="mic-height-val">5.0'</span></div>
         <div class="control-row"><label>Gain</label><input type="range" id="mic-gain" min="-20" max="20" step="1" value="0"><span class="value" id="mic-gain-val">0 dB</span></div>
         <div class="control-row"><label>Rotate</label><input type="range" id="mic-rotation" min="-180" max="180" step="1" value="0"><span class="value" id="mic-rotation-val">0&deg;</span></div>
       </section>
@@ -111,7 +114,7 @@
         <div class="add-player-form">
           <div class="control-row"><label>Name</label><input type="text" id="new-name" placeholder="Name" maxlength="20"></div>
           <div class="control-row"><label>Instrument</label><select id="new-inst"></select></div>
-          <div class="player-height-row"><label style="min-width:50px">Height</label><input type="number" id="new-ft" min="4" max="7" value="5"> ft <input type="number" id="new-in" min="0" max="11" value="10"> in</div>
+          <div class="player-height-row" id="add-player-height-row"></div>
           <button class="add-btn" onclick="addNewPlayer()">+ Add Player</button>
         </div>
       </section>
@@ -128,9 +131,9 @@
         <div class="section-title">How To Use</div>
         <div class="help-text">
           <strong>Drag players</strong> to reposition on stage.<br>
-          <strong>Drag red "Vox" arrow tip</strong> to aim singing direction.<br>
-          <strong>Drag colored "Inst" arrow tip</strong> to aim instrument direction.<br>
-          <strong>Drag source spheres</strong> up/down to adjust source height.<br>
+          <strong>Click+drag Vox arrow</strong> to aim singing direction.<br>
+          <strong>Click+drag Inst arrow</strong> to aim instrument direction.<br>
+          <strong>Drag source cubes</strong> up/down to adjust source height.<br>
           <strong>Click a player</strong> to show directivity patterns.<br>
           <strong>Right-click drag</strong> to orbit camera. <strong>Scroll</strong> to zoom.<br><br>
           The <strong>heatmap</strong> shows mic sensitivity on the floor. The <strong>cardioid outlines</strong> show the mic's pickup pattern (green=strong, yellow=moderate, red=weak).<br><br>
@@ -200,6 +203,7 @@
     // STATE
     // ============================================================
     const state = {
+      metric: false,
       mic: { height: 5.0, gain: 0, rotation: 0 },
       players: DEFAULT_BAND.map(p => ({ ...p, position: { ...p.position } })),
       mixLevels: [],
@@ -224,6 +228,20 @@
 
     function resolveInstHeight(p) { return p.instrumentHeight ?? (p.height * INSTRUMENTS[p.instrument].hFrac); }
     function resolveVoiceHeight(p) { return p.voiceHeight ?? (p.height + VOICE.hOff); }
+
+    // Unit conversion helpers
+    const ftToM = ft => ft / FT_PER_M;
+    const mToFt = m => m * FT_PER_M;
+    function fmtDist(ft) {
+      if (state.metric) return `${ftToM(ft).toFixed(2)} m`;
+      return `${ft.toFixed(1)}'`;
+    }
+    function fmtHeight(ft) {
+      if (state.metric) return `${Math.round(ftToM(ft) * 100)} cm`;
+      const f = Math.floor(ft);
+      const i = Math.round((ft - f) * 12);
+      return `${f}'${i}"`;
+    }
 
     // ============================================================
     // SIMULATION (FIXED: mic angle direction)
@@ -352,6 +370,13 @@
       }
     }
 
+    function snapshotPositions() {
+      return state.players.map(p => ({ x: p.position.x, z: p.position.z }));
+    }
+    function restorePositions(snap) {
+      state.players.forEach((p, i) => { p.position.x = snap[i].x; p.position.z = snap[i].z; });
+    }
+
     function solverStep() {
       if (!state.solverRunning) return;
       const lr = 0.02;
@@ -363,23 +388,31 @@
         return;
       }
 
-      for (const p of state.players) {
+      const grads = [];
+      for (let pi = 0; pi < state.players.length; pi++) {
+        const snap = snapshotPositions();
+        const p = state.players[pi];
+
         // Gradient w.r.t. x
         p.position.x += eps;
         enforceConstraints();
         const sx = computeSpread();
-        p.position.x -= eps;
+        restorePositions(snap);
+
         // Gradient w.r.t. z
         p.position.z += eps;
         enforceConstraints();
         const sz = computeSpread();
-        p.position.z -= eps;
+        restorePositions(snap);
 
-        const gx = (sx - spread0) / eps;
-        const gz = (sz - spread0) / eps;
-        p.position.x -= lr * gx;
-        p.position.z -= lr * gz;
+        grads.push({ gx: (sx - spread0) / eps, gz: (sz - spread0) / eps });
       }
+
+      // Apply all gradients simultaneously
+      state.players.forEach((p, i) => {
+        p.position.x -= lr * grads[i].gx;
+        p.position.z -= lr * grads[i].gz;
+      });
 
       enforceConstraints();
 
@@ -492,6 +525,7 @@
     scene.add(new THREE.GridHelper(STAGE_SIZE, STAGE_SIZE, 0x333355, 0x222244));
 
     const ringGroup = new THREE.Group();
+    const ringLabels = [];
     for (let r = 1; r <= 10; r++) {
       const ring = new THREE.Mesh(
         new THREE.RingGeometry(r-0.015, r+0.015, 128),
@@ -502,13 +536,20 @@
       if (r <= 6) {
         const ld = document.createElement('div');
         ld.className = 'label-distance';
-        ld.textContent = `${r}'`;
+        ld.textContent = state.metric ? `${ftToM(r).toFixed(1)}m` : `${r}'`;
         const lo = new CSS2DObject(ld);
         lo.position.set(r+0.15, 0.01, 0.15);
         ringGroup.add(lo);
+        ringLabels.push({ el: ld, ft: r });
       }
     }
     scene.add(ringGroup);
+
+    function updateRingLabels() {
+      ringLabels.forEach(rl => {
+        rl.el.textContent = state.metric ? `${ftToM(rl.ft).toFixed(1)}m` : `${rl.ft}'`;
+      });
+    }
 
     const hmTex = new THREE.CanvasTexture(generateHeatmap());
     hmTex.minFilter = THREE.LinearFilter;
@@ -600,7 +641,7 @@
     let playerGroups = [];
     let bodyHitTargets = [];
     let sourceHitTargets = [];
-    let arrowTipTargets = [];
+    let arrowHitTargets = [];
     let playerLevelLabels = [];
 
     function clearPlayers3D() {
@@ -618,7 +659,40 @@
           }
         });
       });
-      playerGroups = []; bodyHitTargets = []; sourceHitTargets = []; arrowTipTargets = []; playerLevelLabels = [];
+      playerGroups = []; bodyHitTargets = []; sourceHitTargets = []; arrowHitTargets = []; playerLevelLabels = [];
+    }
+
+    // Custom arrow: cone + shaft as regular meshes (raycasting-friendly, matrixAutoUpdate=true)
+    function makeArrow(dir, origin, length, color, userData) {
+      const grp = new THREE.Group();
+      const headLen = 0.8, headRad = 0.45, shaftRad = 0.06;
+      // Shaft (also a click target)
+      const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(shaftRad, shaftRad, length - headLen, 6),
+        new THREE.MeshStandardMaterial({ color })
+      );
+      shaft.position.y = (length - headLen) / 2;
+      shaft.userData = userData;
+      grp.add(shaft);
+      // Cone head (primary click target)
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry(headRad, headLen, 8),
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.2 })
+      );
+      cone.position.y = length - headLen / 2;
+      cone.userData = userData;
+      grp.add(cone);
+      // Orient: default is +Y, rotate to match dir
+      grp.position.copy(origin);
+      if (dir.y > 0.999) { /* already +Y */ }
+      else if (dir.y < -0.999) { grp.rotation.z = Math.PI; }
+      else {
+        const axis = new THREE.Vector3(0, 1, 0).cross(dir).normalize();
+        const angle = Math.acos(clamp(dir.y, -1, 1));
+        grp.quaternion.setFromAxisAngle(axis, angle);
+        grp.position.copy(origin);
+      }
+      return { group: grp, cone, shaft };
     }
 
     function buildPlayers3D() {
@@ -627,11 +701,11 @@
         const grp = new THREE.Group();
         const col = new THREE.Color(p.color);
         const inst = INSTRUMENTS[p.instrument];
-        const bodyH = p.height * 0.75;
+        const bodyH = p.height;
         const iH = resolveInstHeight(p);
         const vH = resolveVoiceHeight(p);
 
-        // Body (2.5 ft diameter = 1.25 radius)
+        // Body (2.5 ft diameter = 1.25 radius, full player height)
         const body = new THREE.Mesh(
           new THREE.CylinderGeometry(PLAYER_RADIUS, PLAYER_RADIUS, bodyH, 24),
           new THREE.MeshStandardMaterial({ color: col, roughness: 0.7, metalness: 0.1, transparent: true, opacity: 0.75 })
@@ -642,18 +716,9 @@
         grp.add(body);
         bodyHitTargets.push(body);
 
-        // Head
-        const head = new THREE.Mesh(
-          new THREE.SphereGeometry(0.3, 16, 12),
-          new THREE.MeshStandardMaterial({ color: 0xddccaa, roughness: 0.8 })
-        );
-        head.position.y = bodyH + 0.25;
-        head.castShadow = true;
-        grp.add(head);
-
-        // Instrument source marker (draggable)
+        // Instrument source marker (draggable cube)
         const iMarker = new THREE.Mesh(
-          new THREE.SphereGeometry(0.22, 12, 8),
+          new THREE.BoxGeometry(0.35, 0.35, 0.35),
           new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.3 })
         );
         iMarker.position.set(PLAYER_RADIUS + 0.3, iH, 0);
@@ -661,9 +726,9 @@
         grp.add(iMarker);
         sourceHitTargets.push(iMarker);
 
-        // Voice source marker (draggable)
+        // Voice source marker (draggable cube)
         const vMarker = new THREE.Mesh(
-          new THREE.SphereGeometry(0.18, 12, 8),
+          new THREE.BoxGeometry(0.30, 0.30, 0.30),
           new THREE.MeshStandardMaterial({ color: 0xff8888, emissive: 0xff6666, emissiveIntensity: 0.3 })
         );
         vMarker.position.set(0, vH, PLAYER_RADIUS + 0.3);
@@ -671,12 +736,12 @@
         grp.add(vMarker);
         sourceHitTargets.push(vMarker);
 
-        // Voice direction arrow (independent facing) — RED, long, big tip
+        // Voice direction arrow — RED (custom mesh, clickable cone)
         const vDir = voiceLocalDir(p);
-        const vArrow = new THREE.ArrowHelper(vDir, new THREE.Vector3(0, vH, 0), 3.0, 0xff4444, 0.6, 0.4);
-        vArrow.cone.userData = { type: 'arrow', idx: i, facing: 'voice' };
-        grp.add(vArrow);
-        arrowTipTargets.push(vArrow.cone);
+        const vArr = makeArrow(vDir, new THREE.Vector3(0, vH, 0), 3.0, 0xff4444,
+          { type: 'arrow', idx: i, facing: 'voice' });
+        grp.add(vArr.group);
+        arrowHitTargets.push(vArr.cone, vArr.shaft);
         // Voice arrow tip label
         const vTipD = document.createElement('div');
         vTipD.className = 'label-3d';
@@ -687,12 +752,12 @@
         vTipL.position.copy(vDir.clone().multiplyScalar(3.3)).setY(vH);
         grp.add(vTipL);
 
-        // Instrument direction arrow (independent facing) — PLAYER COLOR, long, big tip
+        // Instrument direction arrow — PLAYER COLOR (custom mesh, clickable cone)
         const iDir = instLocalDir(p);
-        const iArrow = new THREE.ArrowHelper(iDir, new THREE.Vector3(0, iH, 0), 3.0, col.getHex(), 0.6, 0.4);
-        iArrow.cone.userData = { type: 'arrow', idx: i, facing: 'instrument' };
-        grp.add(iArrow);
-        arrowTipTargets.push(iArrow.cone);
+        const iArr = makeArrow(iDir, new THREE.Vector3(0, iH, 0), 3.0, col.getHex(),
+          { type: 'arrow', idx: i, facing: 'instrument' });
+        grp.add(iArr.group);
+        arrowHitTargets.push(iArr.cone, iArr.shaft);
         // Instrument arrow tip label
         const iTipD = document.createElement('div');
         iTipD.className = 'label-3d';
@@ -752,21 +817,25 @@
         let arrowCount = 0;
         let css2dCount = 0;
         grp.children.forEach(c => {
-          if (c.isArrowHelper) {
-            if (arrowCount === 0) {
-              c.setDirection(vDir);
-              c.position.set(0, vH, 0);
-            } else {
-              c.setDirection(iDir);
-              c.position.set(0, iH, 0);
+          // Custom arrow groups (identified by having a cone child with arrow userData)
+          if (c.isGroup && c.children.length === 2 && c.children[1].userData && c.children[1].userData.type === 'arrow') {
+            const dir = arrowCount === 0 ? vDir : iDir;
+            const h = arrowCount === 0 ? vH : iH;
+            c.position.set(0, h, 0);
+            if (dir.y > 0.999) { c.quaternion.identity(); }
+            else if (dir.y < -0.999) { c.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI); }
+            else {
+              const axis = new THREE.Vector3(0, 1, 0).cross(dir).normalize();
+              const angle = Math.acos(clamp(dir.y, -1, 1));
+              c.quaternion.setFromAxisAngle(axis, angle);
             }
             arrowCount++;
           }
-          // Update tip label positions (Vox and Inst labels are 3rd and 4th CSS2DObjects)
+          // Update tip label positions (Vox=1st CSS2DObject, Inst=2nd)
           if (c.isCSS2DObject) {
-            if (css2dCount === 2) { // Vox tip label
+            if (css2dCount === 0) { // Vox tip label
               c.position.copy(vDir.clone().multiplyScalar(3.3)).setY(vH);
-            } else if (css2dCount === 3) { // Inst tip label
+            } else if (css2dCount === 1) { // Inst tip label
               c.position.copy(iDir.clone().multiplyScalar(3.3)).setY(iH);
             }
             css2dCount++;
@@ -863,7 +932,7 @@
       const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.rotation.x = -Math.PI / 2;
-      mesh.rotation.z = -facingAngle;
+      mesh.rotation.y = facingAngle;
       mesh.position.set(posX, posY, posZ);
       return mesh;
     }
@@ -911,19 +980,73 @@
       mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
     }
 
+    // Arrow drag via document-level listeners — screen-space delta to match visual direction
+    function startArrowDrag(playerIdx, facingType, startEvent) {
+      state.dragMode = 'arrow';
+      state.dragIndex = playerIdx;
+      state.dragExtra = facingType;
+      orbitControls.enabled = false;
+
+      const p = state.players[playerIdx];
+      const startFacing = facingType === 'voice' ? p.voiceFacing : p.instrumentFacing;
+
+      // Determine sign: does screen-clockwise = world-clockwise-from-above?
+      // Depends on camera orientation (e.g. flips when camera is behind vs in front)
+      const camRight = new THREE.Vector3();
+      const camUp = new THREE.Vector3();
+      camera.matrixWorld.extractBasis(camRight, camUp, new THREE.Vector3());
+      const sign = Math.sign(camRight.z * camUp.x - camRight.x * camUp.z) || 1;
+
+      // Project player position to screen coordinates
+      function playerToScreen() {
+        const v = new THREE.Vector3(p.position.x, 0, p.position.z).project(camera);
+        const rect = renderer.domElement.getBoundingClientRect();
+        return {
+          x: (v.x + 1) / 2 * rect.width + rect.left,
+          y: (-v.y + 1) / 2 * rect.height + rect.top
+        };
+      }
+
+      const ps = playerToScreen();
+      const startScreenAngle = Math.atan2(startEvent.clientX - ps.x, -(startEvent.clientY - ps.y));
+
+      function onMove(e) {
+        const ps2 = playerToScreen();
+        const curScreenAngle = Math.atan2(e.clientX - ps2.x, -(e.clientY - ps2.y));
+        let delta = curScreenAngle - startScreenAngle;
+        // Wrap to [-PI, PI]
+        if (delta > Math.PI) delta -= 2 * Math.PI;
+        if (delta < -Math.PI) delta += 2 * Math.PI;
+        const newFacing = startFacing + sign * delta;
+        if (facingType === 'voice') p.voiceFacing = newFacing;
+        else p.instrumentFacing = newFacing;
+        updateAll();
+        buildPlayerCards();
+      }
+      function onUp() {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        state.dragMode = null;
+        state.dragIndex = -1;
+        state.dragExtra = null;
+        orbitControls.enabled = true;
+        renderer.domElement.style.cursor = 'default';
+      }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    }
+
     renderer.domElement.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
+
       ndc(e);
       raycaster.setFromCamera(mouse, camera);
 
-      // Priority 1: arrow tips
-      const ah = raycaster.intersectObjects(arrowTipTargets);
+      // Priority 1: arrow meshes (cones + shafts)
+      const ah = raycaster.intersectObjects(arrowHitTargets);
       if (ah.length > 0) {
-        state.dragMode = 'arrow';
-        state.dragIndex = ah[0].object.userData.idx;
-        state.dragExtra = ah[0].object.userData.facing;
-        orbitControls.enabled = false;
-        renderer.domElement.style.cursor = 'crosshair';
+        const ud = ah[0].object.userData;
+        startArrowDrag(ud.idx, ud.facing, e);
         return;
       }
 
@@ -933,7 +1056,6 @@
         state.dragMode = 'source';
         state.dragIndex = sh[0].object.userData.idx;
         state.dragExtra = sh[0].object.userData.src;
-        // Vertical drag plane facing camera
         const cd = camera.getWorldDirection(new THREE.Vector3());
         const pn = new THREE.Vector3(cd.x, 0, cd.z).normalize();
         const wp = new THREE.Vector3();
@@ -944,7 +1066,7 @@
         return;
       }
 
-      // Priority 3: body click/drag (also selects player for directivity viz)
+      // Body click/drag (also selects player for directivity viz)
       const bh = raycaster.intersectObjects(bodyHitTargets);
       if (bh.length > 0) {
         const clickedIdx = bh[0].object.userData.idx;
@@ -963,6 +1085,7 @@
     });
 
     renderer.domElement.addEventListener('pointermove', e => {
+      if (state.dragMode === 'arrow') return; // handled by document-level listener
       ndc(e);
       raycaster.setFromCamera(mouse, camera);
 
@@ -982,20 +1105,10 @@
         if (state.dragExtra === 'instrument') p.instrumentHeight = newH;
         else p.voiceHeight = newH;
         updateAll();
-        buildPlayerCards(); // refresh height display
-      } else if (state.dragMode === 'arrow') {
-        raycaster.ray.intersectPlane(floorPlane, isect);
-        const p = state.players[state.dragIndex];
-        const dx = isect.x - p.position.x;
-        const dz = isect.z - p.position.z;
-        const a = Math.atan2(dx, dz);
-        if (state.dragExtra === 'voice') p.voiceFacing = a;
-        else p.instrumentFacing = a;
-        updateAll();
         buildPlayerCards();
       } else {
         // Hover
-        const allTargets = [...arrowTipTargets, ...sourceHitTargets, ...bodyHitTargets];
+        const allTargets = [...arrowHitTargets, ...sourceHitTargets, ...bodyHitTargets];
         const hits = raycaster.intersectObjects(allTargets);
         renderer.domElement.style.cursor = hits.length > 0 ? 'grab' : 'default';
       }
@@ -1023,6 +1136,10 @@
         card.className = 'player-card';
         card.style.borderLeftColor = p.color;
 
+        const heightRow = state.metric
+          ? `<input type="number" min="120" max="220" value="${Math.round(ftToM(p.height)*100)}" data-i="${i}" data-f="htCm" style="width:40px"> cm`
+          : `<input type="number" min="4" max="7" value="${Math.floor(p.height)}" data-i="${i}" data-f="htFt" style="width:28px"> ft <input type="number" min="0" max="11" value="${Math.round((p.height%1)*12)}" data-i="${i}" data-f="htIn" style="width:28px"> in`;
+
         card.innerHTML = `
           <div class="player-header">
             <div class="player-dot" style="background:${p.color}"></div>
@@ -1030,14 +1147,11 @@
             <select class="player-inst-select" data-i="${i}" data-f="instrument">${Object.keys(INSTRUMENTS).map(k => `<option value="${k}" ${k===p.instrument?'selected':''}>${INSTRUMENTS[k].label}</option>`).join('')}</select>
             <button class="remove-player-btn" onclick="removePlayer(${i})" title="Remove">&times;</button>
           </div>
-          <div class="player-height-row">
-            <input type="number" min="4" max="7" value="${Math.floor(p.height)}" data-i="${i}" data-f="htFt" style="width:28px"> ft
-            <input type="number" min="0" max="11" value="${Math.round((p.height%1)*12)}" data-i="${i}" data-f="htIn" style="width:28px"> in
-          </div>
+          <div class="player-height-row">${heightRow}</div>
           <div class="control-row"><label>Inst dB</label><input type="range" min="60" max="100" step="1" value="${p.instrumentSPL}" data-i="${i}" data-f="instrumentSPL"><span class="value">${p.instrumentSPL}</span></div>
-          <div class="control-row"><label>Inst Ht</label><input type="range" min="1" max="${p.height.toFixed(1)}" step="0.1" value="${iH.toFixed(1)}" data-i="${i}" data-f="instrumentHeight"><span class="value">${iH.toFixed(1)}'</span></div>
+          <div class="control-row"><label>Inst Ht</label><input type="range" min="1" max="${p.height.toFixed(1)}" step="0.1" value="${iH.toFixed(1)}" data-i="${i}" data-f="instrumentHeight"><span class="value">${fmtDist(iH)}</span></div>
           <div class="control-row"><label>Voice dB</label><input type="range" min="60" max="100" step="1" value="${p.voiceSPL}" data-i="${i}" data-f="voiceSPL"><span class="value">${p.voiceSPL}</span></div>
-          <div class="control-row"><label>Voice Ht</label><input type="range" min="1" max="${p.height.toFixed(1)}" step="0.1" value="${vH.toFixed(1)}" data-i="${i}" data-f="voiceHeight"><span class="value">${vH.toFixed(1)}'</span></div>
+          <div class="control-row"><label>Voice Ht</label><input type="range" min="1" max="${p.height.toFixed(1)}" step="0.1" value="${vH.toFixed(1)}" data-i="${i}" data-f="voiceHeight"><span class="value">${fmtDist(vH)}</span></div>
           <div class="control-row"><label>Voice Dir</label><input type="range" min="-180" max="180" step="1" value="${Math.round(r2deg(p.voiceFacing))}" data-i="${i}" data-f="voiceFacing"><span class="value">${Math.round(r2deg(p.voiceFacing))}&deg;</span></div>
           <div class="control-row"><label>Inst Dir</label><input type="range" min="-180" max="180" step="1" value="${Math.round(r2deg(p.instrumentFacing))}" data-i="${i}" data-f="instrumentFacing"><span class="value">${Math.round(r2deg(p.instrumentFacing))}&deg;</span></div>
           <label class="singing-toggle"><input type="checkbox" ${p.singing?'checked':''} data-i="${i}" data-f="singing"> Singing</label>
@@ -1054,7 +1168,7 @@
             else if (f === 'instrumentHeight') state.players[idx].instrumentHeight = val;
             else if (f === 'voiceHeight') state.players[idx].voiceHeight = val;
             else state.players[idx][f] = val;
-            e.target.nextElementSibling.textContent = f.includes('Facing') ? `${Math.round(val)}\u00B0` : f.includes('Height') ? `${val.toFixed?val.toFixed(1):val}'` : `${val}`;
+            e.target.nextElementSibling.textContent = f.includes('Facing') ? `${Math.round(val)}\u00B0` : f.includes('Height') ? fmtDist(val) : `${val}`;
             updateAll();
           });
         });
@@ -1077,8 +1191,9 @@
           inp.addEventListener('change', e => {
             const idx = +e.target.dataset.i, f = e.target.dataset.f;
             const p = state.players[idx];
-            if (f === 'htFt') { const ins = Math.round((p.height%1)*12); p.height = parseInt(e.target.value) + ins/12; }
-            if (f === 'htIn') { p.height = Math.floor(p.height) + parseInt(e.target.value)/12; }
+            if (f === 'htCm') { p.height = mToFt(parseInt(e.target.value) / 100); }
+            else if (f === 'htFt') { const ins = Math.round((p.height%1)*12); p.height = parseInt(e.target.value) + ins/12; }
+            else if (f === 'htIn') { p.height = Math.floor(p.height) + parseInt(e.target.value)/12; }
             p.instrumentHeight = null; p.voiceHeight = null; // reset to auto
             rebuildAll();
           });
@@ -1203,7 +1318,7 @@
         const cv = document.getElementById(`mcv-${i}`);
         if (cv) cv.textContent = m.combinedLevel > MIN_DB+1 ? `${m.combinedLevel.toFixed(1)}` : '<-40';
         const de = document.getElementById(`pdist-${i}`);
-        if (de) de.textContent = `${m.distI.toFixed(1)}'`;
+        if (de) de.textContent = fmtDist(m.distI);
         const me = document.getElementById(`pmic-${i}`);
         if (me) me.textContent = m.combinedLevel > MIN_DB+1 ? `${m.combinedLevel.toFixed(1)}` : '--';
       });
@@ -1225,12 +1340,38 @@
       rebuildAll();
     };
 
+    function buildAddForm() {
+      const row = document.getElementById('add-player-height-row');
+      if (state.metric) {
+        row.innerHTML = `<label style="min-width:50px">Height</label><input type="number" id="new-cm" min="120" max="220" value="178" style="width:44px"> cm`;
+      } else {
+        row.innerHTML = `<label style="min-width:50px">Height</label><input type="number" id="new-ft" min="4" max="7" value="5" style="width:32px"> ft <input type="number" id="new-in" min="0" max="11" value="10" style="width:32px"> in`;
+      }
+    }
+
+    window.setUnits = function(u) {
+      state.metric = (u === 'metric');
+      document.querySelectorAll('#unit-toggle button').forEach(b => b.classList.toggle('active', b.dataset.u === u));
+      document.getElementById('mic-height-val').textContent = fmtDist(state.mic.height);
+      updateRingLabels();
+      buildAddForm();
+      buildPlayerCards();
+      buildMixMeters();
+      updateAll();
+    };
+
     window.addNewPlayer = function() {
       const name = document.getElementById('new-name').value.trim() || `Player ${state.players.length+1}`;
       const inst = document.getElementById('new-inst').value;
-      const ft = parseInt(document.getElementById('new-ft').value) || 5;
-      const inches = parseInt(document.getElementById('new-in').value) || 10;
-      const height = ft + inches/12;
+      let height;
+      if (state.metric) {
+        const cm = parseInt(document.getElementById('new-cm').value) || 178;
+        height = mToFt(cm / 100);
+      } else {
+        const ft = parseInt(document.getElementById('new-ft').value) || 5;
+        const inches = parseInt(document.getElementById('new-in').value) || 10;
+        height = ft + inches/12;
+      }
       const ci = state.players.length;
       // Place in a reasonable position
       const angle = -Math.PI/4 + (Math.PI/2)*(ci/(Math.max(state.players.length,1)));
@@ -1253,7 +1394,7 @@
     // ============================================================
     document.getElementById('mic-height').addEventListener('input', e => {
       state.mic.height = parseFloat(e.target.value);
-      document.getElementById('mic-height-val').textContent = `${state.mic.height.toFixed(1)} ft`;
+      document.getElementById('mic-height-val').textContent = fmtDist(state.mic.height);
       updateMicObj(); hmDirty = true; updateAll();
     });
     document.getElementById('mic-gain').addEventListener('input', e => {
@@ -1348,6 +1489,7 @@
       try {
         localStorage.setItem('mic_plot_v3', JSON.stringify({
           mic: state.mic,
+          metric: state.metric,
           players: state.players.map(p => ({ ...p, position: { ...p.position } })),
         }));
       } catch(e) {}
@@ -1358,12 +1500,15 @@
         if (d && d.players && d.players.length > 0) {
           state.players = d.players.map(p => ({ ...p, position: { ...p.position } }));
           Object.assign(state.mic, d.mic);
+          if (d.metric !== undefined) state.metric = d.metric;
           document.getElementById('mic-height').value = state.mic.height;
-          document.getElementById('mic-height-val').textContent = `${state.mic.height.toFixed(1)} ft`;
+          document.getElementById('mic-height-val').textContent = fmtDist(state.mic.height);
           document.getElementById('mic-gain').value = state.mic.gain;
           document.getElementById('mic-gain-val').textContent = `${state.mic.gain} dB`;
           document.getElementById('mic-rotation').value = state.mic.rotation;
           document.getElementById('mic-rotation-val').textContent = `${state.mic.rotation}\u00B0`;
+          // Restore unit toggle UI
+          document.querySelectorAll('#unit-toggle button').forEach(b => b.classList.toggle('active', b.dataset.u === (state.metric ? 'metric' : 'imperial')));
         }
       } catch(e) {}
     }
@@ -1376,6 +1521,8 @@
     Object.keys(INSTRUMENTS).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = INSTRUMENTS[k].label; instSel.appendChild(o); });
 
     loadState();
+    buildAddForm();
+    updateRingLabels();
     buildPlayers3D();
     buildPlayerCards();
     buildMixMeters();
