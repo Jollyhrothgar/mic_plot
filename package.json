@@ -1,0 +1,10 @@
+{
+  "name": "mic_plot",
+  "private": true,
+  "type": "module",
+  "description": "Bluegrass Mic Plot: stage positioning tool for a single-mic band",
+  "scripts": {
+    "test": "node --test tests/sim.test.mjs",
+    "serve": "python3 -m http.server 8000"
+  }
+}
